@@ -9,9 +9,11 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - 2181:2181
+    networks:
+      - kafka-network
 
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.4.0
     container_name: kafka_project
     depends_on:
       - zookeeper
@@ -20,13 +22,13 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_PROCESS_ROLES: broker
-      KAFKA_NODE_ID: 1
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
+    networks:
+      - kafka-network
 
   spark-master:
     image: apache/spark:3.4.1
@@ -36,6 +38,8 @@ services:
     ports:
       - 7077:7077
       - 8082:8080
+    networks:
+      - kafka-network
 
   spark-worker:
     image: apache/spark:3.4.1
@@ -47,6 +51,8 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
     ports:
       - 8083:8081
+    networks:
+      - kafka-network
 
   hadoop-namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop2.7.4-java8
@@ -58,6 +64,8 @@ services:
       - 9000:9000
     volumes:
       - hadoop_namenode:/hadoop/dfs/name
+    networks:
+      - kafka-network
 
   hadoop-datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop2.7.4-java8
@@ -70,6 +78,8 @@ services:
       - CORE_CONF_fs_defaultFS=hdfs://hadoop-namenode:9000
     volumes:
       - hadoop_datanode:/hadoop/dfs/data
+    networks:
+      - kafka-network
 
   airflow:
     image: puckel/docker-airflow:1.10.9
@@ -84,7 +94,9 @@ services:
     ports:
       - 8085:8080
     volumes:
-      - ./dags:/usr/local/airflow/dags  # Adapter selon ton dossier
+      - ./dags:/usr/local/airflow/dags
+    networks:
+      - kafka-network
 
   postgres_db:
     image: postgres:12
@@ -94,17 +106,24 @@ services:
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     ports:
-      - 5433:5433
+      - 5433:5432  
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kafka-network
 
   mongodb:
-    image: mongo:latest
+    image: mongo:7.0  
     container_name: mongodb_project
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin  
+      MONGO_INITDB_ROOT_PASSWORD: password123
     ports:
-      - 27018:27018
+      - 27017:27017  
     volumes:
       - mongodb_data:/data/db
+    networks:
+      - kafka-network
 
   grafana:
     image: grafana/grafana:latest
@@ -114,10 +133,16 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
-      - mongodb
+      - postgres_db 
+    networks:
+      - kafka-network
 
 volumes:
   hadoop_namenode:
   hadoop_datanode:
   postgres_data:
   mongodb_data:
+
+networks:
+  kafka-network:  
+    driver: bridge
