@@ -33,6 +33,7 @@ services:
   spark-master:
     image: apache/spark:3.4.1
     container_name: spark-master_project
+    command: bash -c "/opt/spark/sbin/start-master.sh ; tail -f /dev/null"
     environment:
       - SPARK_MODE=master
     ports:
@@ -44,6 +45,7 @@ services:
   spark-worker:
     image: apache/spark:3.4.1
     container_name: spark-worker_project
+    command: bash -c "/opt/spark/sbin/start-worker.sh spark://spark-master:7077 ; tail -f /dev/null"
     depends_on:
       - spark-master
     environment:
@@ -53,6 +55,7 @@ services:
       - 8083:8081
     networks:
       - kafka-network
+
 
   hadoop-namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop2.7.4-java8
