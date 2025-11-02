@@ -15,9 +15,7 @@ producer = KafkaProducer(
     max_request_size=2 * 1024 * 1024,
 )
 
-topic = 'bdsp_topic_test'
-
-def produce_messages(file_path, flush_every=1000):
+def produce_messages(file_path, topic, flush_every=1000, stop_row=1000):
     if not os.path.exists(file_path):
         print(f"Error: File '{file_path}' not found.")
         return
@@ -27,6 +25,8 @@ def produce_messages(file_path, flush_every=1000):
         with open(file_path, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
+                if stop_row and sent >= stop_row:
+                    break
                 # async send; add simple error callback
                 future = producer.send(topic, value=row)
                 future.add_errback(lambda exc: print(f"Send failed: {exc}"))
@@ -43,9 +43,10 @@ def produce_messages(file_path, flush_every=1000):
 
 if __name__ == "__main__":
     file_path = "data/flights.csv"
+    topic = 'bdsp_topic_test'
     print("Starting to produce messages...")
     try:
-        produce_messages(file_path, flush_every=1000)
+        produce_messages(file_path, topic, flush_every=1000, stop_row=1000)
     finally:
         try:
             producer.close()
