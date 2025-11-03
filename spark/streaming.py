@@ -1,46 +1,37 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, to_timestamp, window, expr, broadcast
-from pyspark.sql.types import StructType, StringType, IntegerType, TimestampType
+from pyspark.sql.functions import from_json, col
+from pyspark.sql.types import StructType, StringType
 
-spark = SparkSession.builder.appName("flights_stream").getOrCreate()
-# Kafka source
+spark = SparkSession.builder \
+    .appName("flights_stream") \
+    .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0") \
+    .getOrCreate()
+
+# Kafka source (adjust bootstrap if needed: kafka:9092 or kafka:29092)
 kafka_df = (spark.readStream.format("kafka")
     .option("kafka.bootstrap.servers", "kafka:9092")
-    .option("subscribe", "flights.events")
-    .option("startingOffsets", "latest")
+    .option("subscribe", "bdsp_topic_test")   # use your topic
+    .option("startingOffsets", "earliest")
     .load())
 
-print("OK")
-# define schema for flights event (select columns you need)
+print("Kafka source created")  # debug visible in spark-submit stdout
+
 schema = StructType() \
-    .add("FL_DATE", StringType()) \
-    .add("OP_CARRIER", StringType()) \
-    .add("ORIGIN", StringType()) \
-    .add("DEST", StringType()) \
-    .add("CRS_DEP_TIME", StringType()) \
-    .add("DEP_DELAY", StringType()) \
-    .add("ARR_DELAY", StringType()) \
-    .add("event_time", StringType()) \
-    # add other fields as needed
+    .add("YEAR", StringType()) \
+    .add("MONTH", StringType()) \
+    .add("DAY", StringType()) \
+    .add("DAY_OF_WEEK", StringType()) \
+    .add("AIRLINE", StringType()) \
+    .add("FLIGHT_NUMBER", StringType()) \
+    
 
-# parsed = kafka_df.select(from_json(col("value").cast("string"), schema).alias("data")).select("data.*")
-# # cast event_time properly
-# events = parsed.withColumn("event_time", to_timestamp("event_time"))
+df = kafka_df.select(from_json(col("value").cast("string"), schema).alias("data")).select("data.*")
 
-# # read lookups (small) and broadcast
-# airlines = spark.read.csv("/data/lookups/airlines.csv", header=True)  # or read from Cassandra
-# airports = spark.read.csv("/data/lookups/airports.csv", header=True)
+# debug: write parsed rows to console
+query = df.writeStream \
+    .format("console") \
+    .option("truncate", False) \
+    .start()
 
-# # Example: 30-minute tumbling window average arrival delay per airline
-# agg = (events
-#        .withWatermark("event_time", "1 hour")
-#        .groupBy(window(col("event_time"), "30 minutes"), col("OP_CARRIER"))
-#        .agg(
-#             expr("avg(cast(ARR_DELAY as double)) as avg_arr_delay"),
-#             expr("count(*) as num_flights")
-#        ))
-
-# # enrich with airline names using broadcast
-# agg_enriched = agg.join(broadcast(airlines), agg.OP_CARRIER == airlines.Code, "left") \
-#                   .select("window", "OP_CARRIER", "Name", "avg_arr_delay", "num_flights")
+query.awaitTermination()
 

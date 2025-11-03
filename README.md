@@ -48,6 +48,12 @@ Upload the notebook `spark\spark_testing.ipynb` in the online Jupyter Notebook.
 
 ---
 
+Alternative
+```bash
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.1 spark/streaming.py
+```
+
+
 ## Verify the Pipeline
 
 Check messages in MongoDB:
