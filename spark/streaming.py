@@ -5,9 +5,12 @@ import pyspark.sql.functions as F
 
 spark = SparkSession.builder \
     .appName("flights_stream") \
+    .config("spark.jars.packages", 
+            "org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.1,"
+            "org.mongodb.spark:mongo-spark-connector_2.13:10.4.0") \
+    .config("spark.mongodb.write.connection.uri", 
+            "mongodb://admin:password123@mongodb:27017/flights_db.processed_flights?authSource=admin") \
     .getOrCreate()
-    # .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0") \
-    # .getOrCreate()
 
 # Kafka source (adjust bootstrap if needed: kafka:9092 or kafka:29092)
 kafka_flights_df = (spark.readStream.format("kafka")
@@ -99,14 +102,77 @@ flights_airlines_airports_df = flights_airlines_airports_df.join(
     "left"
 )
 
-geo_analysis = flights_airlines_airports_df.groupBy("ORIGIN_LATITUDE", "ORIGIN_LONGITUDE")\
-    .agg(F.count("*").alias("flight_count"))\
-    .orderBy("flight_count", ascending=False)
+# Create multiple aggregations for different dashboards
 
-write_query = (geo_analysis.writeStream
-    .outputMode("complete")
-    .format("console")
-    .option("truncate", "false")
-    .start())
+# 1. Airline performance
+airline_stats = flights_airlines_airports_df.groupBy("AIRLINE", "AIRLINES") \
+    .agg(
+        F.count("*").alias("total_flights"),
+        F.avg("DEPARTURE_DELAY").alias("avg_departure_delay"),
+        F.avg("ARRIVAL_DELAY").alias("avg_arrival_delay"),
+        F.sum(F.when(F.col("CANCELLED") == 1, 1).otherwise(0)).alias("cancelled_flights")
+    )
 
-write_query.awaitTermination()
+# 2. Route analysis
+route_stats = flights_airlines_airports_df.groupBy(
+    "ORIGIN_AIRPORT", "ORIGIN_CITY", "ORIGIN_STATE",
+    "DESTINATION_AIRPORT", "DESTINATION_CITY", "DESTINATION_STATE"
+) \
+    .agg(
+        F.count("*").alias("flight_count"),
+        F.avg("DISTANCE").alias("avg_distance"),
+        F.avg("ARRIVAL_DELAY").alias("avg_delay")
+    )
+
+# 3. Geographic heatmap data
+geo_analysis = flights_airlines_airports_df.groupBy(
+    "ORIGIN_LATITUDE", "ORIGIN_LONGITUDE", 
+    "ORIGIN_CITY", "ORIGIN_STATE"
+) \
+    .agg(F.count("*").alias("flight_count"))
+
+# Write each aggregation to different collections
+def write_airline_stats(batch_df, batch_id):
+    batch_df.write \
+        .format("mongodb") \
+        .mode("overwrite") \
+        .option("database", "flights_db") \
+        .option("collection", "airline_stats") \
+        .save()
+
+def write_route_stats(batch_df, batch_id):
+    batch_df.write \
+        .format("mongodb") \
+        .mode("overwrite") \
+        .option("database", "flights_db") \
+        .option("collection", "route_stats") \
+        .save()
+
+def write_geo_analysis(batch_df, batch_id):
+    batch_df.write \
+        .format("mongodb") \
+        .mode("overwrite") \
+        .option("database", "flights_db") \
+        .option("collection", "geo_analysis") \
+        .save()
+
+# Start all streaming queries
+query1 = airline_stats.writeStream \
+    .outputMode("complete") \
+    .foreachBatch(write_airline_stats) \
+    .option("checkpointLocation", "/tmp/checkpoint/airline") \
+    .start()
+
+query2 = route_stats.writeStream \
+    .outputMode("complete") \
+    .foreachBatch(write_route_stats) \
+    .option("checkpointLocation", "/tmp/checkpoint/route") \
+    .start()
+
+query3 = geo_analysis.writeStream \
+    .outputMode("complete") \
+    .foreachBatch(write_geo_analysis) \
+    .option("checkpointLocation", "/tmp/checkpoint/geo") \
+    .start()
+
+query3.awaitTermination()

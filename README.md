@@ -19,7 +19,7 @@ Wait 10-15 seconds for all services to initialize.
 ---
 
 ### Step 2: Run the Producer
-In a terminal, run the producer : `python kafka_producer.py`
+In a terminal, run the producer : `python kafka/kafka_producer.py`
 
 This will send messages from your CSV file to Kafka topic `bdsp_topic_test`.
 
@@ -50,7 +50,7 @@ Upload the notebook `spark\spark_testing.ipynb` in the online Jupyter Notebook.
 
 Alternative
 ```bash
-spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.1 spark/streaming.py
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.mongodb.spark:mongo-spark-connector_2.12:10.2.0 spark/streaming.py
 ```
 
 
