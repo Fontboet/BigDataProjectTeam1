@@ -40,12 +40,12 @@ pip install -r requirements.txt
 echo "✅ All packages installed successfully into '${ENV_NAME}'"
 
 # Set up Cassandra using Docker
-echo "🚀 Setting up Cassandra using Docker..."
+# echo "🚀 Setting up Cassandra using Docker..."
 
-echo "Creating keyspace and tables..."
-docker exec -i cassandra_project cqlsh < cassandra/init.cql
+# echo "Creating keyspace and tables..."
+# docker exec -i cassandra_project cqlsh < cassandra/init.cql
 
-echo "Cassandra initialization complete!"
+# echo "Cassandra initialization complete!"
 
-# Verify tables
-docker exec -i cassandra_project cqlsh -e "DESCRIBE flights_db;"
+# # Verify tables
+# docker exec -i cassandra_project cqlsh -e "DESCRIBE flights_db;"

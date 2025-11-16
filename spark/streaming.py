@@ -5,18 +5,13 @@ import pyspark.sql.functions as F
 
 spark = SparkSession.builder \
     .appName("flights_stream") \
-    .config("spark.jars.packages", 
-            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,"
-            "com.datastax.spark:spark-cassandra-connector_2.12:3.4.1") \
-    .config("spark.cassandra.connection.host", "cassandra") \
+    .config("spark.cassandra.connection.host", "localhost") \
     .config("spark.cassandra.connection.port", "9042") \
-    .config("spark.cassandra.auth.username", "cassandra") \
-    .config("spark.cassandra.auth.password", "cassandra") \
     .getOrCreate()
 
 # Kafka source
 kafka_flights_df = (spark.readStream.format("kafka")
-    .option("kafka.bootstrap.servers", "kafka:9092")
+    .option("kafka.bootstrap.servers", "localhost:9092")
     .option("subscribe", "bdsp_topic_test")
     .option("startingOffsets", "earliest")
     .load())
@@ -63,9 +58,6 @@ flights_df.printSchema()
 airport_df = spark.read.csv('data/airports.csv',header=True,inferSchema=True)
 airline_df = spark.read.csv('data/airlines.csv',header=True,inferSchema=True)
 
-airport_df.printSchema()
-airline_df.printSchema()
-
 airline_df=airline_df.withColumnRenamed("AIRLINE","AIRLINES")
 flights_airlines_df = flights_df.join(airline_df, flights_df.AIRLINE == airline_df.IATA_CODE, "left")\
     .drop(airline_df.IATA_CODE)
@@ -77,8 +69,6 @@ airport_origin_df = airport_df.withColumnRenamed("IATA_CODE", "ORIGIN_AIRPORT_CO
     .withColumnRenamed("COUNTRY", "ORIGIN_COUNTRY")\
     .withColumnRenamed("LATITUDE", "ORIGIN_LATITUDE")\
     .withColumnRenamed("LONGITUDE", "ORIGIN_LONGITUDE")
-
-airport_origin_df.printSchema()
 
 flights_airlines_airports_df = flights_airlines_df.join(
     airport_origin_df,
@@ -101,10 +91,10 @@ flights_airlines_airports_df = flights_airlines_airports_df.join(
     "left"
 )
 
-# Create multiple aggregations for different dashboards
-
-# 1. Airline performance
-airline_stats = flights_airlines_airports_df.groupBy("AIRLINE", "AIRLINES") \
+# 1. Airline performance - Filter null AIRLINE (primary key)
+airline_stats = flights_airlines_airports_df \
+    .filter(col("AIRLINE").isNotNull()) \
+    .groupBy("AIRLINE", "AIRLINES") \
     .agg(
         F.count("*").alias("total_flights"),
         F.avg("DEPARTURE_DELAY").alias("avg_departure_delay"),
@@ -112,26 +102,31 @@ airline_stats = flights_airlines_airports_df.groupBy("AIRLINE", "AIRLINES") \
         F.sum(F.when(F.col("CANCELLED") == 1, 1).otherwise(0)).alias("cancelled_flights")
     )
 
-# 2. Route analysis
-route_stats = flights_airlines_airports_df.groupBy(
-    "ORIGIN_AIRPORT", "ORIGIN_CITY", "ORIGIN_STATE",
-    "DESTINATION_AIRPORT", "DESTINATION_CITY", "DESTINATION_STATE"
-) \
+# 2. Route analysis - Filter null primary keys
+route_stats = flights_airlines_airports_df \
+    .filter(col("ORIGIN_AIRPORT").isNotNull() & col("DESTINATION_AIRPORT").isNotNull()) \
+    .groupBy(
+        "ORIGIN_AIRPORT", "ORIGIN_CITY", "ORIGIN_STATE",
+        "DESTINATION_AIRPORT", "DESTINATION_CITY", "DESTINATION_STATE"
+    ) \
     .agg(
         F.count("*").alias("flight_count"),
         F.avg("DISTANCE").alias("avg_distance"),
         F.avg("ARRIVAL_DELAY").alias("avg_delay")
     )
 
-# 3. Geographic heatmap data
-geo_analysis = flights_airlines_airports_df.groupBy(
-    "ORIGIN_LATITUDE", "ORIGIN_LONGITUDE", 
-    "ORIGIN_CITY", "ORIGIN_STATE"
-) \
+# 3. Geographic heatmap data - Filter null latitude/longitude (primary keys)
+geo_analysis = flights_airlines_airports_df \
+    .filter(col("ORIGIN_LATITUDE").isNotNull() & col("ORIGIN_LONGITUDE").isNotNull()) \
+    .groupBy(
+        "ORIGIN_LATITUDE", "ORIGIN_LONGITUDE", 
+        "ORIGIN_CITY", "ORIGIN_STATE"
+    ) \
     .agg(F.count("*").alias("flight_count"))
 
 # Write to Cassandra functions
 def write_airline_stats(batch_df, batch_id):
+    print(f"Writing airline_stats batch {batch_id} - {batch_df.count()} rows")
     batch_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
@@ -139,6 +134,7 @@ def write_airline_stats(batch_df, batch_id):
         .save()
 
 def write_route_stats(batch_df, batch_id):
+    print(f"Writing route_stats batch {batch_id} - {batch_df.count()} rows")
     batch_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
@@ -146,6 +142,7 @@ def write_route_stats(batch_df, batch_id):
         .save()
 
 def write_geo_analysis(batch_df, batch_id):
+    print(f"Writing geo_analysis batch {batch_id} - {batch_df.count()} rows")
     batch_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
