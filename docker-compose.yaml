@@ -47,202 +47,113 @@ services:
       retries: 5
 
   # ===== SPARK MASTER =====
-  spark-master:
-    image: apache/spark:3.4.1
-    container_name: spark-master_project
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
-    environment:
-      - SPARK_NO_DAEMONIZE=true
-    ports:
-      - 7077:7077
-      - 8082:8080
-    volumes:
-      - spark_master_data:/tmp/spark-data
-    networks:
-      - kafka-network
-    healthcheck:
-      test: curl -f http://localhost:8080 || exit 1
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ===== SPARK WORKER =====
-  spark-worker:
-    image: apache/spark:3.4.1
-    container_name: spark-worker_project
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
-    depends_on:
-      spark-master:
-        condition: service_healthy
-    environment:
-      - SPARK_NO_DAEMONIZE=true
-      - SPARK_WORKER_MEMORY=1G
-      - SPARK_WORKER_CORES=1
-    ports:
-      - 8083:8081
-    volumes:
-      - spark_worker_data:/tmp/spark-data
-    networks:
-      - kafka-network
-
-  # ===== JUPYTER NOTEBOOK (with Spark) =====
-  jupyter-notebook:
-    image: jupyter/all-spark-notebook:spark-3.4.1
-    container_name: jupyter-notebook_project
-    environment:
-      - JUPYTER_ENABLE_LAB=yes
-      - GRANT_SUDO=yes
-      - SPARK_OPTS=--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.apache.hadoop:hadoop-aws:3.3.4
-    ports:
-      - 8888:8888
-      - 4041:4040
-    volumes:
-      - ./notebooks:/home/jovyan/work
-      - spark_jupyter_data:/home/jovyan
-    networks:
-      - kafka-network
-    command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
-
-  # ===== HADOOP NAMENODE =====
-  hadoop-namenode:
-    image: bde2020/hadoop-namenode:2.0.0-hadoop2.7.4-java8
-    container_name: hadoop-namenode_project
-    environment:
-      - CLUSTER_NAME=test
-      - CORE_CONF_fs_defaultFS=hdfs://hadoop-namenode:9000
-    ports:
-      - 9870:50070
-      - 9000:9000
-    volumes:
-      - hadoop_namenode:/hadoop/dfs/name
-    networks:
-      - kafka-network
-
-  # ===== HADOOP DATANODE =====
-  hadoop-datanode:
-    image: bde2020/hadoop-datanode:2.0.0-hadoop2.7.4-java8
-    container_name: hadoop-datanode_project
-    environment:
-      - CORE_CONF_fs_defaultFS=hdfs://hadoop-namenode:9000
-    ports:
-      - 9864:50075
-    volumes:
-      - hadoop_datanode:/hadoop/dfs/data
-    networks:
-      - kafka-network
-
-  # ===== POSTGRES (for Airflow if needed later) =====
-  # postgres_db:
-  #   image: postgres:16-alpine
-  #   container_name: airflow_postgres_project
+  # spark-master:
+  #   image: apache/spark:3.4.1
+  #   container_name: spark-master_project
+  #   command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
   #   environment:
-  #     POSTGRES_USER: airflow
-  #     POSTGRES_PASSWORD: airflow
-  #     POSTGRES_DB: airflow
+  #     - SPARK_NO_DAEMONIZE=true
   #   ports:
-  #     - 5433:5432
+  #     - 7077:7077
+  #     - 8082:8080
   #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
+  #     - spark_master_data:/tmp/spark-data
   #   networks:
   #     - kafka-network
   #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U airflow"]
+  #     test: curl -f http://localhost:8080 || exit 1
   #     interval: 10s
   #     timeout: 5s
   #     retries: 5
 
-  # ===== AIRFLOW (commented for now) =====
-  # airflow-init:
-  #   image: apache/airflow:2.8.1-python3.11
-  #   container_name: airflow-init_project
-  #   entrypoint: /bin/bash
-  #   command: 
-  #     - -c
-  #     - |
-  #       airflow db migrate
-  #       airflow users create \
-  #         --username admin \
-  #         --password admin \
-  #         --firstname Admin \
-  #         --lastname User \
-  #         --role Admin \
-  #         --email admin@example.com
-  #   environment:
-  #     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-  #     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_db:5432/airflow
-  #     AIRFLOW__CORE__FERNET_KEY: 'UKMzEm3yIuFYEq1y3-2FxPNWSVwRASpahmQ9kQfEr8E='
-  #     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+  # # ===== SPARK WORKER =====
+  # spark-worker:
+  #   image: apache/spark:3.4.1
+  #   container_name: spark-worker_project
+  #   command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
   #   depends_on:
-  #     postgres_db:
+  #     spark-master:
   #       condition: service_healthy
-  #   networks:
-  #     - kafka-network
-
-  # airflow-webserver:
-  #   image: apache/airflow:2.8.1-python3.11
-  #   container_name: airflow-webserver_project
-  #   command: webserver
-  #   restart: always
   #   environment:
-  #     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-  #     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_db:5432/airflow
-  #     AIRFLOW__CORE__FERNET_KEY: 'UKMzEm3yIuFYEq1y3-2FxPNWSVwRASpahmQ9kQfEr8E='
-  #     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-  #     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+  #     - SPARK_NO_DAEMONIZE=true
+  #     - SPARK_WORKER_MEMORY=1G
+  #     - SPARK_WORKER_CORES=1
   #   ports:
-  #     - 8085:8080
+  #     - 8083:8081
   #   volumes:
-  #     - ./dags:/opt/airflow/dags
-  #     - airflow_logs:/opt/airflow/logs
-  #     - ./plugins:/opt/airflow/plugins
-  #   depends_on:
-  #     - airflow-init
-  #     - postgres_db
+  #     - spark_worker_data:/tmp/spark-data
   #   networks:
   #     - kafka-network
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
 
-  # airflow-scheduler:
-  #   image: apache/airflow:2.8.1-python3.11
-  #   container_name: airflow-scheduler_project
-  #   command: scheduler
-  #   restart: always
+  # ===== JUPYTER NOTEBOOK (with Spark) =====
+  # jupyter-notebook:
+  #   image: jupyter/all-spark-notebook:spark-3.4.1
+  #   container_name: jupyter-notebook_project
   #   environment:
-  #     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-  #     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_db:5432/airflow
-  #     AIRFLOW__CORE__FERNET_KEY: 'UKMzEm3yIuFYEq1y3-2FxPNWSVwRASpahmQ9kQfEr8E='
-  #     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+  #     - JUPYTER_ENABLE_LAB=yes
+  #     - GRANT_SUDO=yes
+  #     - SPARK_OPTS=--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.apache.hadoop:hadoop-aws:3.3.4
+  #   ports:
+  #     - 8888:8888
+  #     - 4041:4040
   #   volumes:
-  #     - ./dags:/opt/airflow/dags
-  #     - airflow_logs:/opt/airflow/logs
-  #     - ./plugins:/opt/airflow/plugins
-  #   depends_on:
-  #     - airflow-init
-  #     - postgres_db
+  #     - ./notebooks:/home/jovyan/work
+  #     - spark_jupyter_data:/home/jovyan
+  #   networks:
+  #     - kafka-network
+  #   command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
+
+  # ===== HADOOP NAMENODE =====
+  # hadoop-namenode:
+  #   image: bde2020/hadoop-namenode:2.0.0-hadoop2.7.4-java8
+  #   container_name: hadoop-namenode_project
+  #   environment:
+  #     - CLUSTER_NAME=test
+  #     - CORE_CONF_fs_defaultFS=hdfs://hadoop-namenode:9000
+  #   ports:
+  #     - 9870:50070
+  #     - 9000:9000
+  #   volumes:
+  #     - hadoop_namenode:/hadoop/dfs/name
   #   networks:
   #     - kafka-network
 
-  # ===== MONGODB =====
-  mongodb:
-    image: mongo:7.0
-    container_name: mongodb_project
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password123
+  # # ===== HADOOP DATANODE =====
+  # hadoop-datanode:
+  #   image: bde2020/hadoop-datanode:2.0.0-hadoop2.7.4-java8
+  #   container_name: hadoop-datanode_project
+  #   environment:
+  #     - CORE_CONF_fs_defaultFS=hdfs://hadoop-namenode:9000
+  #   ports:
+  #     - 9864:50075
+  #   volumes:
+  #     - hadoop_datanode:/hadoop/dfs/data
+  #   networks:
+  #     - kafka-network
+
+  # ===== CASSANDRA =====
+  cassandra:
+    image: cassandra:4.1
+    container_name: cassandra_project
     ports:
-      - 27017:27017
+      - 9042:9042  # CQL native transport port
+      - 7000:7000  # Inter-node communication
+      - 7199:7199  # JMX monitoring
+    environment:
+      - CASSANDRA_CLUSTER_NAME=FlightCluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - MAX_HEAP_SIZE=512M
+      - HEAP_NEWSIZE=100M
     volumes:
-      - mongodb_data:/data/db
+      - cassandra_data:/var/lib/cassandra
     networks:
       - kafka-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster' || exit 1"]
+      interval: 30s
+      timeout: 10s
       retries: 5
 
   # ===== GRAFANA =====
@@ -253,11 +164,14 @@ services:
       - 3000:3000
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_INSTALL_PLUGINS=grafana-clock-panel
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,hadesarchitect-cassandra-datasource
     volumes:
       - grafana_data:/var/lib/grafana
     networks:
       - kafka-network
+    depends_on:
+      cassandra:
+        condition: service_healthy
 
 # ===== VOLUMES =====
 volumes:
@@ -269,11 +183,8 @@ volumes:
   spark_jupyter_data:
   hadoop_namenode:
   hadoop_datanode:
-  mongodb_data:
+  cassandra_data:
   grafana_data:
-  # Airflow volumes (uncomment if needed)
-  # postgres_data:
-  # airflow_logs:
 
 # ===== NETWORKS =====
 networks:

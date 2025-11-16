@@ -6,20 +6,22 @@ import pyspark.sql.functions as F
 spark = SparkSession.builder \
     .appName("flights_stream") \
     .config("spark.jars.packages", 
-            "org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.1,"
-            "org.mongodb.spark:mongo-spark-connector_2.13:10.4.0") \
-    .config("spark.mongodb.write.connection.uri", 
-            "mongodb://admin:password123@mongodb:27017/flights_db.processed_flights?authSource=admin") \
+            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,"
+            "com.datastax.spark:spark-cassandra-connector_2.12:3.4.1") \
+    .config("spark.cassandra.connection.host", "cassandra") \
+    .config("spark.cassandra.connection.port", "9042") \
+    .config("spark.cassandra.auth.username", "cassandra") \
+    .config("spark.cassandra.auth.password", "cassandra") \
     .getOrCreate()
 
-# Kafka source (adjust bootstrap if needed: kafka:9092 or kafka:29092)
+# Kafka source
 kafka_flights_df = (spark.readStream.format("kafka")
     .option("kafka.bootstrap.servers", "kafka:9092")
-    .option("subscribe", "bdsp_topic_test")   # use your topic
+    .option("subscribe", "bdsp_topic_test")
     .option("startingOffsets", "earliest")
     .load())
 
-print("Kafka source created")  # debug visible in spark-submit stdout
+print("Kafka source created")
 
 flights_schema = StructType() \
     .add("YEAR", IntegerType()) \
@@ -56,21 +58,18 @@ flights_schema = StructType() \
 
 flights_df = kafka_flights_df.select(from_json(col("value").cast("string"), flights_schema).alias("data")).select("data.*")
 
-flights_df.printSchema()  # debug: print schema of parsed DataFrame
+flights_df.printSchema()
 
 airport_df = spark.read.csv('data/airports.csv',header=True,inferSchema=True)
 airline_df = spark.read.csv('data/airlines.csv',header=True,inferSchema=True)
 
-airport_df.printSchema()  # debug: print schema of airport DataFrame
-airline_df.printSchema()  # debug: print schema of airline DataFrame
-
+airport_df.printSchema()
+airline_df.printSchema()
 
 airline_df=airline_df.withColumnRenamed("AIRLINE","AIRLINES")
-# Join the Flights DataFrame with Airlines DataFrame on AIRLINE -> IATA_CODE
 flights_airlines_df = flights_df.join(airline_df, flights_df.AIRLINE == airline_df.IATA_CODE, "left")\
-    .drop(airline_df.IATA_CODE)  # Drop duplicate IATA_CODE column after join
+    .drop(airline_df.IATA_CODE)
 
-# Rename columns in airportdf for the first join
 airport_origin_df = airport_df.withColumnRenamed("IATA_CODE", "ORIGIN_AIRPORT_CODE")\
     .withColumnRenamed("AIRPORT", "ORIGIN_AIRPORT_NAME")\
     .withColumnRenamed("CITY", "ORIGIN_CITY")\
@@ -131,29 +130,26 @@ geo_analysis = flights_airlines_airports_df.groupBy(
 ) \
     .agg(F.count("*").alias("flight_count"))
 
-# Write each aggregation to different collections
+# Write to Cassandra functions
 def write_airline_stats(batch_df, batch_id):
     batch_df.write \
-        .format("mongodb") \
-        .mode("overwrite") \
-        .option("database", "flights_db") \
-        .option("collection", "airline_stats") \
+        .format("org.apache.spark.sql.cassandra") \
+        .mode("append") \
+        .options(table="airline_stats", keyspace="flights_db") \
         .save()
 
 def write_route_stats(batch_df, batch_id):
     batch_df.write \
-        .format("mongodb") \
-        .mode("overwrite") \
-        .option("database", "flights_db") \
-        .option("collection", "route_stats") \
+        .format("org.apache.spark.sql.cassandra") \
+        .mode("append") \
+        .options(table="route_stats", keyspace="flights_db") \
         .save()
 
 def write_geo_analysis(batch_df, batch_id):
     batch_df.write \
-        .format("mongodb") \
-        .mode("overwrite") \
-        .option("database", "flights_db") \
-        .option("collection", "geo_analysis") \
+        .format("org.apache.spark.sql.cassandra") \
+        .mode("append") \
+        .options(table="geo_analysis", keyspace="flights_db") \
         .save()
 
 # Start all streaming queries
