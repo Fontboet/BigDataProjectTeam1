@@ -2,96 +2,60 @@
 # BigDataProjectTeam1
 Big Data Storage and Processing 2025 Project Team 1
 
-# How to Run the Kafka Pipeline
-
-## Step-by-Step Execution Order
-
-### Step 0: Requirements
-Start the bash setup file : `setup.sh`
-
-### Step 1: Start Docker Services
-Start Kafka, Zookeeper, and MongoDB: 
-
-docker-compose up -d
-
-Wait 10-15 seconds for all services to initialize.
-
----
-
-### Step 2: Run the Producer
-In a terminal, run the producer : `python kafka/kafka_producer.py`
-
-This will send messages from your CSV file to Kafka topic `bdsp_topic_test`.
-
-Let it run for a few seconds, then stop it with `Ctrl+C`.
-
----
-
-### Step 3: Run the Consumer
-In another terminal (keep the first one open if needed):
-
-conda activate datalab
-python kafka_consumer_mongodb.py
-
-
-This consumer will:
-- Read messages from Kafka topic `bdsp_topic_test`
-- Insert them into MongoDB collection `flights_db.raw_flights`
-
-The consumer will continue running and processing new messages in real-time.
-
----
-
-### Step 4: Run Spark :
-Go to http://localhost:8888. \
-Upload the notebook `spark\spark_testing.ipynb` in the online Jupyter Notebook.
-
----
-
-Alternative
+# How to Run the Pipeline
+Start the stack:
 ```bash
-spark-submit \
-  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1 \
-  --conf spark.cassandra.connection.host=localhost \
-  --conf spark.cassandra.connection.port=9042 \
-  spark/streaming.py
+docker compose up -d
+```
+Check service status:
+```bash
+docker compose ps
 ```
 
-
 ## Verify the Pipeline
-
-Check messages in MongoDB:
-
-docker exec -it mongodb_project mongosh -u admin -p password123
-
-
-Then in MongoDB shell:
-
-use flights_db
-db.raw_flights.countDocuments()
-db.raw_flights.find().limit(5)
-
-
----
-
-## Summary
-
-**Order:** Docker → Producer → Consumer
-
-**Files:**
-1. `docker-compose.yml` - Infrastructure (Kafka, Zookeeper, MongoDB)
-2. `kafka_producer.py` - Sends data to Kafka
-3. `kafka_consumer_mongodb.py` - Reads from Kafka and stores in MongoDB
-
----
+Confirm topic creation:
+```bash
+docker compose logs kafka-init --no-log-prefix | tail -n 100
+```
+Validate producer -> Kafka:
+```bash
+docker compose logs producer --no-log-prefix | tail -n 100
+```
+Validate consumer -> Cassandra:
+```bash
+docker compose exec kafka bash -lc "kafka-console-consumer --bootstrap-server kafka:9092 --topic bdsp_topic_test --from-beginning --max-messages 5 --property print.value=true"
+```
+Start Spark submit (if not auto-started):
+```bash
+docker compose up -d spark-submit
+```
+Watch logs:
+```bash
+docker compose logs spark-submit --no-log-prefix | tail -n 300
+```
+Spark shows “Kafka source created” and connector jars downloading/resolved.
+Validate Cassandra schema and counts:
+```bash
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT keyspace_name FROM system_schema.keyspaces WHERE keyspace_name='flights_db';\""
+```
+```bash
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT COUNT(*) FROM flights_db.airline_stats;\""
+```
+Validate route_stats:
+```bash
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT COUNT(*) FROM flights_db.route_stats;\""
+```
+Validate geo_analysis:
+```bash
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT COUNT(*) FROM flights_db.geo_analysis;\""
+```
+Grafana:
+    - Open http://localhost:3000 (default admin/admin)
 
 ## Stop Everything
-
-Stop consumer: `Ctrl+C`
-
-Stop Docker services:
-
-docker-compose down
+```bash
+docker compose down
+```
 
 
 
