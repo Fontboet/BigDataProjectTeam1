@@ -49,6 +49,13 @@ Validate geo_analysis:
 ```bash
 docker compose exec cassandra bash -lc "cqlsh -e \"SELECT COUNT(*) FROM flights_db.geo_analysis;\""
 ```
+Confirm HDFS cluster status :
+```bash
+docker exec -it namenode hdfs dfsadmin -report
+```
+Check HDFS Web UI : http://localhost:9870
+
+
 Grafana:
     - Open http://localhost:3000 (default admin/admin)
 
@@ -56,6 +63,7 @@ Grafana:
 ```bash
 docker compose down
 ```
+
 
 
 
