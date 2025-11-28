@@ -1,4 +1,4 @@
-version: "3.8"
+# version: "3.8"
 
 services:
   zookeeper:
@@ -227,6 +227,62 @@ services:
           cpus: "0.50"
           memory: "256M"
 
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    hostname: namenode
+    container_name: namenode
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    networks:
+      - bigdata
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hdfs/hadoop.env
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9870' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: "1G"
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    hostname: datanode
+    container_name: datanode
+    depends_on:
+      namenode:
+        condition: service_healthy
+    ports:
+      - "9866:9866"
+    networks:
+      - bigdata
+    volumes:
+      - hadoop_datanode:/hadoop/dfs/data
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+    env_file:
+      - ./hdfs/hadoop.env
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9866' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: "2G"
+
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -255,3 +311,5 @@ volumes:
   grafana-data:
   spark-checkpoints:
   spark-ivy:
+  hadoop_namenode:
+  hadoop_datanode:
