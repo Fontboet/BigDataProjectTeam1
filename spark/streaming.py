@@ -2,18 +2,20 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StringType, IntegerType
 import pyspark.sql.functions as F
+import os
 
 spark = SparkSession.builder \
     .appName("flights_stream") \
-    .config("spark.cassandra.connection.host", "localhost") \
-    .config("spark.cassandra.connection.port", "9042") \
+    .config("spark.cassandra.connection.host", os.environ.get("CASSANDRA_HOST", "cassandra")) \
+    .config("spark.cassandra.connection.port", os.environ.get("CASSANDRA_PORT", "9042")) \
     .getOrCreate()
 
 # Kafka source
 kafka_flights_df = (spark.readStream.format("kafka")
-    .option("kafka.bootstrap.servers", "localhost:9092")
-    .option("subscribe", "bdsp_topic_test")
+    .option("kafka.bootstrap.servers", os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092"))
+    .option("subscribe", os.environ.get("KAFKA_TOPIC", "bdsp_topic_test"))
     .option("startingOffsets", "earliest")
+    .option("failOnDataLoss", "false")
     .load())
 
 print("Kafka source created")
@@ -102,6 +104,15 @@ airline_stats = flights_airlines_airports_df \
         F.sum(F.when(F.col("CANCELLED") == 1, 1).otherwise(0)).alias("cancelled_flights")
     )
 
+airline_stats_out = airline_stats.select(
+    col("AIRLINE").alias("airline"),
+    col("AIRLINES").alias("airlines"),
+    col("total_flights"),
+    col("avg_departure_delay"),
+    col("avg_arrival_delay"),
+    col("cancelled_flights")
+)
+
 # 2. Route analysis - Filter null primary keys
 route_stats = flights_airlines_airports_df \
     .filter(col("ORIGIN_AIRPORT").isNotNull() & col("DESTINATION_AIRPORT").isNotNull()) \
@@ -115,6 +126,18 @@ route_stats = flights_airlines_airports_df \
         F.avg("ARRIVAL_DELAY").alias("avg_delay")
     )
 
+route_stats_out = route_stats.select(
+    col("ORIGIN_AIRPORT").alias("origin_airport"),
+    col("ORIGIN_CITY").alias("origin_city"),
+    col("ORIGIN_STATE").alias("origin_state"),
+    col("DESTINATION_AIRPORT").alias("destination_airport"),
+    col("DESTINATION_CITY").alias("destination_city"),
+    col("DESTINATION_STATE").alias("destination_state"),
+    col("flight_count"),
+    col("avg_distance"),
+    col("avg_delay")
+)
+
 # 3. Geographic heatmap data - Filter null latitude/longitude (primary keys)
 geo_analysis = flights_airlines_airports_df \
     .filter(col("ORIGIN_LATITUDE").isNotNull() & col("ORIGIN_LONGITUDE").isNotNull()) \
@@ -123,6 +146,14 @@ geo_analysis = flights_airlines_airports_df \
         "ORIGIN_CITY", "ORIGIN_STATE"
     ) \
     .agg(F.count("*").alias("flight_count"))
+
+geo_analysis_out = geo_analysis.select(
+    col("ORIGIN_CITY").alias("origin_city"),
+    col("ORIGIN_STATE").alias("origin_state"),
+    col("ORIGIN_LATITUDE").alias("origin_latitude"),
+    col("ORIGIN_LONGITUDE").alias("origin_longitude"),
+    col("flight_count")
+)
 
 # Write to Cassandra functions
 def write_airline_stats(batch_df, batch_id):
@@ -150,22 +181,25 @@ def write_geo_analysis(batch_df, batch_id):
         .save()
 
 # Start all streaming queries
-query1 = airline_stats.writeStream \
+query1 = airline_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_airline_stats) \
     .option("checkpointLocation", "/tmp/checkpoint/airline") \
+    .trigger(processingTime="10 seconds") \
     .start()
 
-query2 = route_stats.writeStream \
+query2 = route_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_route_stats) \
     .option("checkpointLocation", "/tmp/checkpoint/route") \
+    .trigger(processingTime="10 seconds") \
     .start()
 
-query3 = geo_analysis.writeStream \
+query3 = geo_analysis_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_geo_analysis) \
     .option("checkpointLocation", "/tmp/checkpoint/geo") \
+    .trigger(processingTime="10 seconds") \
     .start()
 
 query3.awaitTermination()

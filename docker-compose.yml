@@ -1,0 +1,315 @@
+version: "3.8"
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.1
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - bigdata
+    volumes:
+      - zk-data:/var/lib/zookeeper/data
+      - zk-log:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/2181' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: "512M"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.1
+    container_name: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    networks:
+      - bigdata
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9092' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: "1G"
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.1
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: >-
+      bash -lc "kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic bdsp_topic_test --partitions 1 --replication-factor 1 && kafka-topics --bootstrap-server kafka:9092 --list"
+    networks:
+      - bigdata
+    restart: "no"
+
+  cassandra:
+    image: cassandra:4.1
+    container_name: cassandra
+    environment:
+      CASSANDRA_CLUSTER_NAME: "Test Cluster"
+      CASSANDRA_NUM_TOKENS: 256
+      MAX_HEAP_SIZE: "1024M"
+      HEAP_NEWSIZE: "256M"
+    ports:
+      - "9042:9042"
+    networks:
+      - bigdata
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9042' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: "2G"
+
+  cassandra-init:
+    image: cassandra:4.1
+    container_name: cassandra-init
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    command:
+      - bash
+      - -lc
+      - >-
+        echo "Creating keyspace and tables" && 
+        cqlsh cassandra -e "CREATE KEYSPACE IF NOT EXISTS flights_db WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};" && 
+        cqlsh cassandra -e "CREATE TABLE IF NOT EXISTS flights_db.airline_stats (airline text PRIMARY KEY, airlines text, total_flights int, avg_departure_delay double, avg_arrival_delay double, cancelled_flights int);" && 
+        cqlsh cassandra -e "CREATE TABLE IF NOT EXISTS flights_db.route_stats (origin_airport text, origin_city text, origin_state text, destination_airport text, destination_city text, destination_state text, flight_count int, avg_distance double, avg_delay double, PRIMARY KEY ((origin_airport, destination_airport)));" && 
+        cqlsh cassandra -e "CREATE TABLE IF NOT EXISTS flights_db.geo_analysis (origin_city text, origin_state text, origin_latitude double, origin_longitude double, flight_count int, PRIMARY KEY ((origin_city, origin_state), origin_latitude, origin_longitude));" && 
+        echo "Schema ready"
+    networks:
+      - bigdata
+    restart: "no"
+
+  spark-master:
+    image: apache/spark:3.5.3
+    container_name: spark-master
+    command: /opt/spark/sbin/start-master.sh -h spark-master -p 7077 --webui-port 8080
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    networks:
+      - bigdata
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8080' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: "1G"
+
+  spark-worker:
+    image: apache/spark:3.5.3
+    container_name: spark-worker
+    depends_on:
+      spark-master:
+        condition: service_started
+    command: /opt/spark/sbin/start-worker.sh spark://spark-master:7077 --webui-port 8081 --cores 2 --memory 2G
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+    ports:
+      - "8081:8081"
+    networks:
+      - bigdata
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: "2G"
+
+  spark-submit:
+    image: apache/spark:3.5.3
+    container_name: spark-submit
+    user: "0"
+    depends_on:
+      spark-master:
+        condition: service_started
+      spark-worker:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      cassandra:
+        condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    working_dir: /app
+    command: >-
+      bash -c "mkdir -p /tmp/.ivy2/cache /tmp/.ivy2/jars && /opt/spark/bin/spark-submit \
+      --master spark://spark-master:7077 \
+      --deploy-mode client \
+      --conf spark.sql.shuffle.partitions=4 \
+      --conf spark.jars.ivy=/tmp/.ivy2 \
+      --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector-assembly_2.12:3.5.0 \
+      /app/spark/streaming.py"
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=bdsp_topic_test
+      - CASSANDRA_HOST=cassandra
+      - CASSANDRA_PORT=9042
+    networks:
+      - bigdata
+    volumes:
+      - ./:/app
+      - spark-checkpoints:/tmp/checkpoint
+      - spark-ivy:/tmp/.ivy2
+    restart: on-failure
+
+  producer:
+    image: python:3.10-slim
+    container_name: kafka-producer
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    working_dir: /app
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=bdsp_topic_test
+    command: >-
+      bash -c "pip install --no-cache-dir kafka-python && python kafka/producer.py"
+    networks:
+      - bigdata
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: "256M"
+
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    hostname: namenode
+    container_name: namenode
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    networks:
+      - bigdata
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hdfs/hadoop.env
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9870' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: "1G"
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    hostname: datanode
+    container_name: datanode
+    depends_on:
+      namenode:
+        condition: service_healthy
+    ports:
+      - "9866:9866"
+    networks:
+      - bigdata
+    volumes:
+      - hadoop_datanode:/hadoop/dfs/data
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+    env_file:
+      - ./hdfs/hadoop.env
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9866' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: "2G"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - bigdata
+    volumes:
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: "512M"
+
+networks:
+  bigdata:
+    driver: bridge
+
+volumes:
+  zk-data:
+  zk-log:
+  kafka-data:
+  cassandra-data:
+  grafana-data:
+  spark-checkpoints:
+  spark-ivy:
+  hadoop_namenode:
+  hadoop_datanode:
