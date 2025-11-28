@@ -41,7 +41,8 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_DELETE_TOPIC_ENABLE: "true" 
     ports:
       - "9092:9092"
     networks:
@@ -67,7 +68,7 @@ services:
       kafka:
         condition: service_healthy
     command: >-
-      bash -lc "kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic bdsp_topic_test --partitions 1 --replication-factor 1 && kafka-topics --bootstrap-server kafka:9092 --list"
+      bash -lc "kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic flights_topic --partitions 1 --replication-factor 1 && kafka-topics --bootstrap-server kafka:9092 --list"
     networks:
       - bigdata
     restart: "no"
@@ -191,7 +192,7 @@ services:
       /app/spark/streaming.py"
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - KAFKA_TOPIC=bdsp_topic_test
+      - KAFKA_TOPIC=flights_topic
       - CASSANDRA_HOST=cassandra
       - CASSANDRA_PORT=9042
     networks:
@@ -213,9 +214,9 @@ services:
     working_dir: /app
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - KAFKA_TOPIC=bdsp_topic_test
+      - KAFKA_TOPIC=flights_topic
     command: >-
-      bash -c "pip install --no-cache-dir kafka-python && python kafka/producer.py"
+      bash -c "pip install -r requirements.txt && python kafka/kafka_producer.py"
     networks:
       - bigdata
     volumes:

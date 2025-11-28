@@ -13,7 +13,7 @@ spark = SparkSession.builder \
 # Kafka source
 kafka_flights_df = (spark.readStream.format("kafka")
     .option("kafka.bootstrap.servers", os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092"))
-    .option("subscribe", os.environ.get("KAFKA_TOPIC", "bdsp_topic_test"))
+    .option("subscribe", os.environ.get("KAFKA_TOPIC", "flights_topic"))
     .option("startingOffsets", "earliest")
     .option("failOnDataLoss", "false")
     .load())
