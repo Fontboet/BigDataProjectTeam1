@@ -184,22 +184,22 @@ def write_geo_analysis(batch_df, batch_id):
 query1 = airline_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_airline_stats) \
-    .option("checkpointLocation", "/tmp/checkpoint/airline") \
     .trigger(processingTime="10 seconds") \
     .start()
+    # .option("checkpointLocation", "/tmp/checkpoint/airline") \
 
 query2 = route_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_route_stats) \
-    .option("checkpointLocation", "/tmp/checkpoint/route") \
     .trigger(processingTime="10 seconds") \
     .start()
+    # .option("checkpointLocation", "/tmp/checkpoint/route") \
 
 query3 = geo_analysis_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_geo_analysis) \
-    .option("checkpointLocation", "/tmp/checkpoint/geo") \
     .trigger(processingTime="10 seconds") \
     .start()
+    # .option("checkpointLocation", "/tmp/checkpoint/geo") \
 
 query3.awaitTermination()
