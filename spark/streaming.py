@@ -10,6 +10,8 @@ spark = SparkSession.builder \
     .config("spark.cassandra.connection.port", os.environ.get("CASSANDRA_PORT", "9042")) \
     .getOrCreate()
 
+# print("Topic: ", os.environ.get("KAFKA_TOPIC", "flights_topic"))
+
 # Kafka source
 kafka_flights_df = (spark.readStream.format("kafka")
     .option("kafka.bootstrap.servers", os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092"))

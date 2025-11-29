@@ -15,12 +15,13 @@ def wait_for_kafka(bootstrap_servers: str, timeout_sec: int = 120):
             time.sleep(2)
     return False
 
-def produce_messages(file_path, producer, topic, flush_every=1000):
+def produce_messages(file_path, producer, topic, flush_every=20000):
     if not os.path.exists(file_path):
         print(f"Error: File '{file_path}' not found.")
         return
     sent = 0
     start = time.time()
+    sample_logged = False
     try:
         with open(file_path, 'r') as f:
             reader = csv.DictReader(f)
@@ -29,8 +30,12 @@ def produce_messages(file_path, producer, topic, flush_every=1000):
                 future = producer.send(topic, value=row)
                 future.add_errback(lambda exc: print(f"Send failed: {exc}"))
                 sent += 1
+                if not sample_logged:
+                    print(f"Sample record: {json.dumps(row)[:500]}")
+                    sample_logged = True
                 if sent % flush_every == 0:
                     producer.flush()   # flush periodically to keep memory bounded
+                    print(f"Flushed at {sent} records...")
         producer.flush()
     except Exception as e:
         print(f"Error while producing messages: {e}")
@@ -42,6 +47,9 @@ def produce_messages(file_path, producer, topic, flush_every=1000):
 def main(file_path: str):
     bootstrap = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
     topic = os.environ.get("KAFKA_TOPIC", "flights_topic")
+    csv_env = os.environ.get("CSV_FILE")
+    if csv_env:
+        file_path = csv_env
 
     if not wait_for_kafka(bootstrap):
         raise RuntimeError("Kafka not reachable within timeout")
@@ -49,12 +57,12 @@ def main(file_path: str):
     producer = KafkaProducer(
         bootstrap_servers=bootstrap,
         value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-        retries=5,
-        acks=1,                     # faster (tradeoff: lower durability). Use 'all' for safety.
-        compression_type='lz4',     # reduce network usage (requires kafka broker support)
-        linger_ms=100,              # wait up to 100ms to batch records
-        batch_size=64 * 1024,       # larger batch size (64KB)
-        max_request_size=2 * 1024 * 1024,
+        retries=0,
+        acks=0,
+        compression_type='lz4',
+        linger_ms=10,
+        batch_size=512 * 1024,
+        max_request_size=5 * 1024 * 1024,
     )
 
     produce_messages(file_path, producer, topic, flush_every=1000)
