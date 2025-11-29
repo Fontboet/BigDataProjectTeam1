@@ -3,6 +3,8 @@ from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StringType, IntegerType
 import pyspark.sql.functions as F
 import os
+import sys
+import time
 
 spark = SparkSession.builder \
     .appName("flights_stream") \
@@ -10,10 +12,11 @@ spark = SparkSession.builder \
     .config("spark.cassandra.connection.port", os.environ.get("CASSANDRA_PORT", "9042")) \
     .getOrCreate()
 
+
 # Kafka source
 kafka_flights_df = (spark.readStream.format("kafka")
     .option("kafka.bootstrap.servers", os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092"))
-    .option("subscribe", os.environ.get("KAFKA_TOPIC", "bdsp_topic_test"))
+    .option("subscribe", os.environ.get("KAFKA_TOPIC", "flights_topic"))
     .option("startingOffsets", "earliest")
     .option("failOnDataLoss", "false")
     .load())
@@ -158,48 +161,105 @@ geo_analysis_out = geo_analysis.select(
 # Write to Cassandra functions
 def write_airline_stats(batch_df, batch_id):
     print(f"Writing airline_stats batch {batch_id} - {batch_df.count()} rows")
+
+    # Write to Cassandra
     batch_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
         .options(table="airline_stats", keyspace="flights_db") \
         .save()
 
+    # Write to HDFS as Parquet
+    batch_df.write \
+        .mode("append") \
+        .parquet(f"hdfs://namenode:9000/flights/airline_stats/")
+
+
 def write_route_stats(batch_df, batch_id):
     print(f"Writing route_stats batch {batch_id} - {batch_df.count()} rows")
+
+    # Write to Cassandra
     batch_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
         .options(table="route_stats", keyspace="flights_db") \
         .save()
 
+    # Write to HDFS
+    batch_df.write \
+        .mode("append") \
+        .parquet("hdfs://namenode:9000/flights/route_stats/")
+
+
 def write_geo_analysis(batch_df, batch_id):
     print(f"Writing geo_analysis batch {batch_id} - {batch_df.count()} rows")
+
+    # Write to Cassandra
     batch_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
         .options(table="geo_analysis", keyspace="flights_db") \
         .save()
 
+    # Write to HDFS
+    batch_df.write \
+        .mode("append") \
+        .parquet("hdfs://namenode:9000/flights/geo_analysis/")
+
+
 # Start all streaming queries
 query1 = airline_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_airline_stats) \
-    .option("checkpointLocation", "/tmp/checkpoint/airline") \
+    .option("checkpointLocation", "hdfs://namenode:9000/checkpoints/airline") \
     .trigger(processingTime="10 seconds") \
     .start()
+
+print("✓ Query 1 (airline_stats) started")
 
 query2 = route_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_route_stats) \
-    .option("checkpointLocation", "/tmp/checkpoint/route") \
+    .option("checkpointLocation", "hdfs://namenode:9000/checkpoints/route") \
     .trigger(processingTime="10 seconds") \
     .start()
+
+print("✓ Query 2 (route_stats) started")
 
 query3 = geo_analysis_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_geo_analysis) \
-    .option("checkpointLocation", "/tmp/checkpoint/geo") \
+    .option("checkpointLocation", "hdfs://namenode:9000/checkpoints/geo") \
     .trigger(processingTime="10 seconds") \
     .start()
 
-query3.awaitTermination()
+print("✓ Query 3 (geo_analysis) started")
+
+print("Raw Kafka stream output (for debugging):")
+raw_df = kafka_flights_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+query = raw_df.writeStream \
+    .outputMode("append") \
+    .format("console") \
+    .option("truncate", False) \
+    .start()
+query.awaitTermination()
+
+
+
+while query1.isActive or query2.isActive or query3.isActive:
+    def safe_rows(q):
+        lp = q.lastProgress
+        return lp['numInputRows'] if lp else 0
+
+    status_line = (
+        f"Q1 rows={safe_rows(query1)} | "
+        f"Q2 rows={safe_rows(query2)} | "
+        f"Q3 rows={safe_rows(query3)}"
+    )
+    print(status_line, end="\r", flush=True)
+    time.sleep(2)
+
+
+    
+
+print("\nStreaming queries finished")
