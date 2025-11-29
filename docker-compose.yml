@@ -88,10 +88,11 @@ services:
     volumes:
       - cassandra-data:/var/lib/cassandra
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9042' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 40
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
     deploy:
       resources:
@@ -188,7 +189,7 @@ services:
       --deploy-mode client \
       --conf spark.sql.shuffle.partitions=4 \
       --conf spark.jars.ivy=/tmp/.ivy2 \
-      --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector-assembly_2.12:3.5.0 \
+      --packages com.datastax.spark:spark-cassandra-connector_2.12:3.3.0,com.datastax.spark:spark-cassandra-connector-assembly_2.12:3.3.0
       /app/spark/streaming.py"
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
