@@ -11,6 +11,10 @@ Check service status:
 ```bash
 docker compose ps
 ```
+Note :
+```bash
+docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" # can be more readable
+```
 
 ## Verify the Pipeline
 Confirm topic creation:
@@ -23,7 +27,7 @@ docker compose logs producer --no-log-prefix | tail -n 100
 ```
 Validate consumer -> Cassandra:
 ```bash
-docker compose exec kafka bash -lc "kafka-console-consumer --bootstrap-server kafka:9092 --topic bdsp_topic_test --from-beginning --max-messages 5 --property print.value=true"
+docker compose exec kafka bash -lc "kafka-console-consumer --bootstrap-server kafka:9092 --topic flights_topic --from-beginning --max-messages 5 --property print.value=true"
 ```
 Start Spark submit (if not auto-started):
 ```bash
