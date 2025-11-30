@@ -204,6 +204,7 @@ services:
     restart: on-failure
 
   producer:
+    profiles: ["manual"]
     image: python:3.10-slim
     container_name: kafka-producer
     depends_on:
@@ -221,7 +222,7 @@ services:
       - bigdata
     volumes:
       - ./:/app
-    restart: unless-stopped
+    restart: no
     deploy:
       resources:
         limits:
