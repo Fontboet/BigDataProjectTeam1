@@ -2,6 +2,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StringType, IntegerType
 import pyspark.sql.functions as F
+from pyspark.sql.functions import current_timestamp
 import os
 
 spark = SparkSession.builder \
@@ -157,17 +158,23 @@ geo_analysis_out = geo_analysis.select(
     col("flight_count")
 )
 
-# Write to Cassandra functions
 def write_airline_stats(batch_df, batch_id):
     print(f"Writing airline_stats batch {batch_id} - {batch_df.count()} rows")
+
+    batch_df = batch_df.withColumn("updated_at", current_timestamp())
+
     batch_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
         .options(table="airline_stats", keyspace="flights_db") \
         .save()
 
+
 def write_route_stats(batch_df, batch_id):
     print(f"Writing route_stats batch {batch_id} - {batch_df.count()} rows")
+
+    batch_df = batch_df.withColumn("updated_at", current_timestamp())
+
     batch_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
@@ -176,6 +183,9 @@ def write_route_stats(batch_df, batch_id):
 
 def write_geo_analysis(batch_df, batch_id):
     print(f"Writing geo_analysis batch {batch_id} - {batch_df.count()} rows")
+
+    batch_df = batch_df.withColumn("updated_at", current_timestamp())
+
     batch_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
