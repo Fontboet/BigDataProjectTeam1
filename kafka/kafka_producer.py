@@ -15,7 +15,7 @@ def wait_for_kafka(bootstrap_servers: str, timeout_sec: int = 120):
             time.sleep(2)
     return False
 
-def produce_messages(file_path, producer, topic, flush_every=20000):
+def produce_messages(file_path, producer, topic, flush_every=1000):
     if not os.path.exists(file_path):
         print(f"Error: File '{file_path}' not found.")
         return
@@ -57,12 +57,12 @@ def main(file_path: str):
     producer = KafkaProducer(
         bootstrap_servers=bootstrap,
         value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-        retries=0,
-        acks=0,
-        compression_type='lz4',
-        linger_ms=10,
-        batch_size=512 * 1024,
-        max_request_size=5 * 1024 * 1024,
+        retries=5,
+        acks=1,                     # faster (tradeoff: lower durability). Use 'all' for safety.
+        compression_type='lz4',     # reduce network usage (requires kafka broker support)
+        linger_ms=100,              # wait up to 100ms to batch records
+        batch_size=64 * 1024,       # larger batch size (64KB)
+        max_request_size=2 * 1024 * 1024,
     )
 
     produce_messages(file_path, producer, topic, flush_every=1000)

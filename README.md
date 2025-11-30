@@ -86,6 +86,31 @@ Grafana:
 docker compose down
 ```
 
+# Configs
+## Kafka
+Short guide to choose Kafka producer settings (tradeoffs + examples).
+
+Key principles
+
+Durability vs throughput vs latency: acks and retries impact durability; batch_size and linger_ms impact throughput and latency; compression reduces network at cost of CPU.
+Broker config matters: acks='all' requires replication and min.insync.replicas settings. Topic auto-recovery / re-creation can interfere with deletes.
+Measure & iterate: benchmark with your payload size and target throughput, monitor producer/broker metrics (request-latency, record-send-rate, batch-size, record-error-rate).
+Parameter-by-parameter (quick)
+
+retries: number of retry attempts for transient errors. Use >=5 for production; very large for strong durability. Pair with idempotence if available to avoid duplicates.
+acks: "0" = fastest, "1" = leader ack (default), "all" = wait for ISR → best durability. Use "all" in production when you need no data loss.
+batch_size (bytes): max size per batch. Larger → fewer requests, better throughput, more memory. Start 64KB–256KB depending on record size.
+linger_ms: time to wait to accumulate a batch. 0 = no wait (low latency). 50–200ms for throughput; smaller for low-latency.
+compression_type: 'lz4' or 'snappy' typical. LZ4 gives good CPU/throughput; gzip best compression but higher CPU/latency.
+flush_every (app-level): how often you call producer.flush() when streaming from files. Frequent flush → less memory and quicker persistence but higher overhead. For bulk load use larger flush_every (e.g., 5k–50k); for streaming/low-loss use small (100–1k).
+max_request_size: must be >= largest message size + overhead. Increase if you produce large JSON payloads.
+max_in_flight_requests_per_connection: set <=5 (or 1) if using retries without idempotence to avoid reordering; if idempotence enabled the client may require <=5.
+Monitoring & testing
+
+Run small benchmarks: measure total time and msg/s for different batch_size/linger_ms combos.
+Watch metrics (broker and producer): record-send-rate, request-latency, batch-size, queue-time-ms, outgoing-byte-rate, record-error-rate.
+Use kafka-topics --describe to confirm ISR and replication; ensure min.insync.replicas configured if using acks='all'.
+
 
 
 
