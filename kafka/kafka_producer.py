@@ -21,6 +21,7 @@ def produce_messages(file_path, producer, topic, flush_every=1000):
         return
     sent = 0
     start = time.time()
+    sample_logged = False
     try:
         with open(file_path, 'r') as f:
             reader = csv.DictReader(f)
@@ -29,8 +30,12 @@ def produce_messages(file_path, producer, topic, flush_every=1000):
                 future = producer.send(topic, value=row)
                 future.add_errback(lambda exc: print(f"Send failed: {exc}"))
                 sent += 1
+                if not sample_logged:
+                    print(f"Sample record: {json.dumps(row)[:500]}")
+                    sample_logged = True
                 if sent % flush_every == 0:
                     producer.flush()   # flush periodically to keep memory bounded
+                    print(f"Flushed at {sent} records...")
         producer.flush()
     except Exception as e:
         print(f"Error while producing messages: {e}")
@@ -42,6 +47,9 @@ def produce_messages(file_path, producer, topic, flush_every=1000):
 def main(file_path: str):
     bootstrap = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
     topic = os.environ.get("KAFKA_TOPIC", "flights_topic")
+    csv_env = os.environ.get("CSV_FILE")
+    if csv_env:
+        file_path = csv_env
 
     if not wait_for_kafka(bootstrap):
         raise RuntimeError("Kafka not reachable within timeout")
