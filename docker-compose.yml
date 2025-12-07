@@ -181,8 +181,8 @@ services:
         condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
-      # hdfs-init:
-        # condition: service_completed_successfully
+      hdfs-init:
+        condition: service_completed_successfully
     working_dir: /app
     command: >-
       bash -c "mkdir -p /tmp/.ivy2/cache /tmp/.ivy2/jars && /opt/spark/bin/spark-submit \

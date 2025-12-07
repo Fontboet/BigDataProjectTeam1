@@ -246,24 +246,47 @@ query = raw_df.writeStream \
     .format("console") \
     .option("truncate", False) \
     .start()
-query.awaitTermination()
 
+# Global timing
+start_time = time.time()
+total_rows = 0
+TARGET_MESSAGES = 1000
 
+def measure_progress():
+    global total_rows, start_time
+    num_rows = 0
 
-while query1.isActive or query2.isActive or query3.isActive:
-    def safe_rows(q):
+    for q in [query1, query2, query3]:
         lp = q.lastProgress
-        return lp['numInputRows'] if lp else 0
+        if lp and "numInputRows" in lp:
+            num_rows += lp["numInputRows"]
 
-    status_line = (
-        f"Q1 rows={safe_rows(query1)} | "
-        f"Q2 rows={safe_rows(query2)} | "
-        f"Q3 rows={safe_rows(query3)}"
-    )
-    print(status_line, end="\r", flush=True)
-    time.sleep(2)
+    total_rows = num_rows
 
+    print(f"Processed: {total_rows} messages", end="\r", flush=True)
 
-    
+    if total_rows >= TARGET_MESSAGES:
+        elapsed = time.time() - start_time
+        print(f"\n==== PERFORMANCE RESULT ====")
+        print(f"Processed {TARGET_MESSAGES} messages in {elapsed:.2f} seconds")
+        print(f"Throughput: {TARGET_MESSAGES / elapsed:.2f} msg/sec")
+
+        # Stop everything
+        query.stop()
+        query1.stop()
+        query2.stop()
+        query3.stop()
+        return True
+
+    return False
+
+print("Tracking time to process 1000 messages...")
+
+while True:
+    if measure_progress():
+        break
+    time.sleep(1)
+
+print("Streaming finished after measurement")
 
 print("\nStreaming queries finished")
