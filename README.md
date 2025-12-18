@@ -45,15 +45,21 @@ Validate Cassandra schema and counts:
 docker compose exec cassandra bash -lc "cqlsh -e \"SELECT keyspace_name FROM system_schema.keyspaces WHERE keyspace_name='flights_db';\""
 ```
 ```bash
-docker compose exec cassandra bash -lc "cqlsh -e \"SELECT COUNT(*) FROM flights_db.airline_stats;\""
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT airline, updated_at, total_flights
+FROM flights_db.airline_stats
+LIMIT 10;\""
 ```
 Validate route_stats:
 ```bash
-docker compose exec cassandra bash -lc "cqlsh -e \"SELECT COUNT(*) FROM flights_db.route_stats;\""
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT origin_airport, destination_airport, updated_at, flight_count
+FROM flights_db.route_stats
+LIMIT 10;\""
 ```
 Validate geo_analysis:
 ```bash
-docker compose exec cassandra bash -lc "cqlsh -e \"SELECT COUNT(*) FROM flights_db.geo_analysis;\""
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT origin_city, origin_state, updated_at, flight_count
+FROM flights_db.geo_analysis
+LIMIT 10;\""
 ```
 Confirm HDFS cluster status :
 ```bash
