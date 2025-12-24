@@ -181,8 +181,6 @@ services:
         condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
-      # hdfs-init:
-      #   condition: service_completed_successfully
     working_dir: /app
     command: >-
       bash -c "mkdir -p /tmp/.ivy2/cache /tmp/.ivy2/jars && /opt/spark/bin/spark-submit \
@@ -225,11 +223,6 @@ services:
     volumes:
       - ./:/app
     restart: no
-    # deploy:
-    #   resources:
-    #     limits:
-    #       cpus: "0.50"
-    #       memory: "256M"
 
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
@@ -252,28 +245,6 @@ services:
       timeout: 5s
       retries: 20
     restart: unless-stopped
-    # deploy: x
-    #   resources:
-    #     limits:
-    #       cpus: "1.00"
-    #       memory: "1G"
-
-  # hdfs-init:
-  #   image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
-  #   container_name: hdfs-init
-  #   networks:
-  #     - bigdata
-  #   depends_on:
-  #     namenode:
-  #       condition: service_healthy
-  #     datanode:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ./hdfs/init-namenode.sh:/tmp/init-namenode.sh:ro
-  #   command: ["/bin/bash", "/tmp/init-namenode.sh"]
-  #   env_file:
-  #   - ./hdfs/hadoop.env
-  #   restart: "on-failure"
 
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
