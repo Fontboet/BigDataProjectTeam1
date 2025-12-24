@@ -97,65 +97,89 @@ flights_airlines_airports_df = flights_airlines_airports_df.join(
 )
 
 # 1. Airline performance - Filter null AIRLINE (primary key)
+# Columns: airline, cancelled_flights, on_time_flights, delayed_flights, avg_departure_delay, avg_arrival_delay
+
 airline_stats = flights_airlines_airports_df \
     .filter(col("AIRLINE").isNotNull()) \
-    .groupBy("AIRLINE", "AIRLINES") \
+    .groupBy("AIRLINE") \
     .agg(
-        F.count("*").alias("total_flights"),
+        F.sum(F.when(F.col("CANCELLED") == 1, 1).otherwise(0)).alias("cancelled_flights"),
+        F.sum(F.when((F.col("CANCELLED") == 0) & (F.col("DEPARTURE_DELAY") <= 15), 1).otherwise(0)).alias("on_time_flights"),
+        F.sum(F.when((F.col("CANCELLED") == 0) & (F.col("DEPARTURE_DELAY") > 15), 1).otherwise(0)).alias("delayed_flights"),
         F.avg("DEPARTURE_DELAY").alias("avg_departure_delay"),
-        F.avg("ARRIVAL_DELAY").alias("avg_arrival_delay"),
-        F.sum(F.when(F.col("CANCELLED") == 1, 1).otherwise(0)).alias("cancelled_flights")
+        F.avg("ARRIVAL_DELAY").alias("avg_arrival_delay")
     )
 
 airline_stats_out = airline_stats.select(
     col("AIRLINE").alias("airline"),
-    col("AIRLINES").alias("airlines"),
-    col("total_flights"),
+    col("cancelled_flights"),
+    col("on_time_flights"),
+    col("delayed_flights"),
     col("avg_departure_delay"),
-    col("avg_arrival_delay"),
-    col("cancelled_flights")
+    col("avg_arrival_delay")
 )
 
-# 2. Route analysis - Filter null primary keys
+# 2. Delay by Reason Analysis
+# Columns: delay_reason, count, avg_duration
+# We need to unpivot the delay columns to analyze reasons
+
+# Select delay columns
+delay_cols = [
+    "AIR_SYSTEM_DELAY", "SECURITY_DELAY", "AIRLINE_DELAY", 
+    "LATE_AIRCRAFT_DELAY", "WEATHER_DELAY"
+]
+
+# Filter rows where at least one delay reason > 0
+delay_df = flights_airlines_airports_df.filter(
+    (col("AIR_SYSTEM_DELAY") > 0) | 
+    (col("SECURITY_DELAY") > 0) | 
+    (col("AIRLINE_DELAY") > 0) | 
+    (col("LATE_AIRCRAFT_DELAY") > 0) | 
+    (col("WEATHER_DELAY") > 0)
+)
+
+# Unpivot/Stack the delay columns
+# Using a stack expression string dynamically
+stack_expr = "stack(5, " + ", ".join([f"'{c}', {c}" for c in delay_cols]) + ") as (delay_reason, duration)"
+
+delay_unpivoted = delay_df.selectExpr(stack_expr) \
+    .filter(col("duration") > 0)
+
+delay_stats = delay_unpivoted \
+    .groupBy("delay_reason") \
+    .agg(
+        F.count("*").alias("count"),
+        F.avg("duration").alias("avg_duration")
+    )
+
+delay_stats_out = delay_stats.select(
+    col("delay_reason"),
+    col("count"),
+    col("avg_duration")
+)
+
+# 3. Route analysis - Filter null primary keys
 route_stats = flights_airlines_airports_df \
     .filter(col("ORIGIN_AIRPORT").isNotNull() & col("DESTINATION_AIRPORT").isNotNull()) \
     .groupBy(
-        "ORIGIN_AIRPORT", "ORIGIN_CITY", "ORIGIN_STATE",
-        "DESTINATION_AIRPORT", "DESTINATION_CITY", "DESTINATION_STATE"
+        "ORIGIN_AIRPORT", "DESTINATION_AIRPORT",
+        "ORIGIN_CITY", "ORIGIN_STATE", "ORIGIN_LATITUDE", "ORIGIN_LONGITUDE",
+        "DESTINATION_CITY", "DESTINATION_STATE"
     ) \
     .agg(
-        F.count("*").alias("flight_count"),
-        F.avg("DISTANCE").alias("avg_distance"),
         F.avg("ARRIVAL_DELAY").alias("avg_delay")
     )
 
 route_stats_out = route_stats.select(
-    col("ORIGIN_AIRPORT").alias("origin_airport"),
-    col("ORIGIN_CITY").alias("origin_city"),
-    col("ORIGIN_STATE").alias("origin_state"),
+    col("ORIGIN_AIRPORT").alias("original_airport"),
     col("DESTINATION_AIRPORT").alias("destination_airport"),
+    col("ORIGIN_CITY").alias("original_city"),
+    col("ORIGIN_STATE").alias("original_state"),
     col("DESTINATION_CITY").alias("destination_city"),
     col("DESTINATION_STATE").alias("destination_state"),
-    col("flight_count"),
-    col("avg_distance"),
+    col("ORIGIN_LATITUDE").alias("original_latitude"),
+    col("ORIGIN_LONGITUDE").alias("original_longitude"),
     col("avg_delay")
-)
-
-# 3. Geographic heatmap data - Filter null latitude/longitude (primary keys)
-geo_analysis = flights_airlines_airports_df \
-    .filter(col("ORIGIN_LATITUDE").isNotNull() & col("ORIGIN_LONGITUDE").isNotNull()) \
-    .groupBy(
-        "ORIGIN_LATITUDE", "ORIGIN_LONGITUDE", 
-        "ORIGIN_CITY", "ORIGIN_STATE"
-    ) \
-    .agg(F.count("*").alias("flight_count"))
-
-geo_analysis_out = geo_analysis.select(
-    col("ORIGIN_CITY").alias("origin_city"),
-    col("ORIGIN_STATE").alias("origin_state"),
-    col("ORIGIN_LATITUDE").alias("origin_latitude"),
-    col("ORIGIN_LONGITUDE").alias("origin_longitude"),
-    col("flight_count")
 )
 
 def write_airline_stats(batch_df, batch_id):
@@ -167,8 +191,21 @@ def write_airline_stats(batch_df, batch_id):
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
         .options(table="airline_stats", keyspace="flights_db") \
+        .option("spark.cassandra.output.consistency.level", "LOCAL_QUORUM") \
         .save()
 
+
+def write_delay_stats(batch_df, batch_id):
+    print(f"Writing delay_stats batch {batch_id} - {batch_df.count()} rows")
+
+    batch_df = batch_df.withColumn("updated_at", current_timestamp())
+
+    batch_df.write \
+        .format("org.apache.spark.sql.cassandra") \
+        .mode("append") \
+        .options(table="delay_by_reason", keyspace="flights_db") \
+        .option("spark.cassandra.output.consistency.level", "LOCAL_QUORUM") \
+        .save()
 
 def write_route_stats(batch_df, batch_id):
     print(f"Writing route_stats batch {batch_id} - {batch_df.count()} rows")
@@ -179,17 +216,7 @@ def write_route_stats(batch_df, batch_id):
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
         .options(table="route_stats", keyspace="flights_db") \
-        .save()
-
-def write_geo_analysis(batch_df, batch_id):
-    print(f"Writing geo_analysis batch {batch_id} - {batch_df.count()} rows")
-
-    batch_df = batch_df.withColumn("updated_at", current_timestamp())
-
-    batch_df.write \
-        .format("org.apache.spark.sql.cassandra") \
-        .mode("append") \
-        .options(table="geo_analysis", keyspace="flights_db") \
+        .option("spark.cassandra.output.consistency.level", "LOCAL_QUORUM") \
         .save()
 
 # Start all streaming queries
@@ -200,18 +227,18 @@ query1 = airline_stats_out.writeStream \
     .start()
     # .option("checkpointLocation", "/tmp/checkpoint/airline") \
 
-query2 = route_stats_out.writeStream \
+query2 = delay_stats_out.writeStream \
+    .outputMode("complete") \
+    .foreachBatch(write_delay_stats) \
+    .trigger(processingTime="10 seconds") \
+    .start()
+    # .option("checkpointLocation", "/tmp/checkpoint/delay") \
+
+query3 = route_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_route_stats) \
     .trigger(processingTime="10 seconds") \
     .start()
     # .option("checkpointLocation", "/tmp/checkpoint/route") \
-
-query3 = geo_analysis_out.writeStream \
-    .outputMode("complete") \
-    .foreachBatch(write_geo_analysis) \
-    .trigger(processingTime="10 seconds") \
-    .start()
-    # .option("checkpointLocation", "/tmp/checkpoint/geo") \
 
 query3.awaitTermination()

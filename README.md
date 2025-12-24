@@ -13,7 +13,7 @@ docker compose ps
 ```
 Note :
 ```bash
-docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" # can be more readable
+docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
 ```
 
 ## Verify the Pipeline
@@ -45,22 +45,21 @@ Validate Cassandra schema and counts:
 docker compose exec cassandra bash -lc "cqlsh -e \"SELECT keyspace_name FROM system_schema.keyspaces WHERE keyspace_name='flights_db';\""
 ```
 ```bash
-docker compose exec cassandra bash -lc "cqlsh -e \"SELECT airline, updated_at, total_flights
-FROM flights_db.airline_stats
-LIMIT 10;\""
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, airline, total_flights
+FROM flights_db.airline_stats;\""
 ```
 Validate route_stats:
 ```bash
-docker compose exec cassandra bash -lc "cqlsh -e \"SELECT origin_airport, destination_airport, updated_at, flight_count
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, origin_airport, destination_airport, avg_delay
 FROM flights_db.route_stats
 LIMIT 10;\""
 ```
-Validate geo_analysis:
+Validate delay_by_reason:
 ```bash
-docker compose exec cassandra bash -lc "cqlsh -e \"SELECT origin_city, origin_state, updated_at, flight_count
-FROM flights_db.geo_analysis
-LIMIT 10;\""
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, delay_reason, count, avg_duration
+FROM flights_db.delay_by_reason;\""
 ```
+
 Confirm HDFS cluster status :
 ```bash
 docker exec -it namenode hdfs dfsadmin -report
@@ -83,9 +82,7 @@ Grafana:
 - Kafka -> Spark schema: `spark/streaming.py` defines fields like `AIRLINE`, `ORIGIN_AIRPORT`, delays, distance
 - Joins: airlines by `IATA_CODE`; airports by origin/destination IATA codes
 - Cassandra tables:
-  * `airline_stats(airline PK, airlines, totals, delays, cancelled_flights, updated_at)`
-  * `route_stats((origin_airport, destination_airport) PK, cities/states, counts, avg_distance, avg_delay, updated_at)`
-  * `geo_analysis((origin_city, origin_state) PK + coords, flight_count, updated_at)`
+
 
 ## Stop Everything
 ```bash

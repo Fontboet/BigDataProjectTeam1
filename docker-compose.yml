@@ -105,16 +105,12 @@ services:
     depends_on:
       cassandra:
         condition: service_healthy
-    command:
-      - bash
-      - -lc
-      - >-
-        echo "Creating keyspace and tables" && 
-        cqlsh cassandra -e "CREATE KEYSPACE IF NOT EXISTS flights_db WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};" && 
-        cqlsh cassandra -e "CREATE TABLE IF NOT EXISTS flights_db.airline_stats (airline text PRIMARY KEY, airlines text, total_flights int, avg_departure_delay double, avg_arrival_delay double, cancelled_flights int, updated_at timestamp);" && 
-        cqlsh cassandra -e "CREATE TABLE IF NOT EXISTS flights_db.route_stats (origin_airport text, origin_city text, origin_state text, destination_airport text, destination_city text, destination_state text, flight_count int, avg_distance double, avg_delay double, updated_at timestamp, PRIMARY KEY ((origin_airport, destination_airport)));" && 
-        cqlsh cassandra -e "CREATE TABLE IF NOT EXISTS flights_db.geo_analysis (origin_city text, origin_state text, origin_latitude double, origin_longitude double, flight_count int, updated_at timestamp, PRIMARY KEY ((origin_city, origin_state), origin_latitude, origin_longitude));" && 
-        echo "Schema ready"
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: >
+      bash -lc "until cqlsh cassandra 9042 -e 'describe keyspaces' >/dev/null 2>&1; do sleep 2; done;
+      cqlsh cassandra 9042 -f /app/cassandra/init_cassandra.cql"
     networks:
       - bigdata
     restart: "no"
