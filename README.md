@@ -15,7 +15,11 @@ Note :
 ```bash
 docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
 ```
-
+If cassandra_init fails:
+init manually:
+```bash
+docker exec -i cassandra cqlsh < cassandra/init_cassandra.cql
+```
 ## Verify the Pipeline
 Confirm topic creation:
 ```bash
