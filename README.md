@@ -25,6 +25,10 @@ Confirm topic creation:
 ```bash
 docker compose logs kafka-init --no-log-prefix | tail -n 100
 ```
+Run producer manually if run first time:
+```bash
+docker compose up -d producer
+```
 Validate producer -> Kafka:
 ```bash
 docker compose logs producer --no-log-prefix | tail -n 100
@@ -41,7 +45,7 @@ docker compose up -d spark-submit
 Watch logs:
 ```bash
 docker compose logs spark-submit --no-log-prefix | tail -n 300
-docker compose logs spark-submit --no-log-prefix | grep -E "Kafka source created|Writing airline_stats|Writing route_stats|Writing geo_analysis" | tail -n 50
+docker compose logs spark-submit --no-log-prefix | grep -E "Kafka source created|Writing airline_stats|Writing route_stats|Writing delay_stats" | tail -n 50
 ```
 Spark shows “Kafka source created” and connector jars downloading/resolved.
 Validate Cassandra schema and counts:
@@ -49,12 +53,12 @@ Validate Cassandra schema and counts:
 docker compose exec cassandra bash -lc "cqlsh -e \"SELECT keyspace_name FROM system_schema.keyspaces WHERE keyspace_name='flights_db';\""
 ```
 ```bash
-docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, airline, total_flights
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, airline, on_time_flights, delayed_flights, avg_departure_delay
 FROM flights_db.airline_stats;\""
 ```
 Validate route_stats:
 ```bash
-docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, origin_airport, destination_airport, avg_delay
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, original_airport, destination_airport, avg_delay
 FROM flights_db.route_stats
 LIMIT 10;\""
 ```
@@ -117,7 +121,6 @@ Monitoring & testing
 Run small benchmarks: measure total time and msg/s for different batch_size/linger_ms combos.
 Watch metrics (broker and producer): record-send-rate, request-latency, batch-size, queue-time-ms, outgoing-byte-rate, record-error-rate.
 Use kafka-topics --describe to confirm ISR and replication; ensure min.insync.replicas configured if using acks='all'.
-
 
 
 
