@@ -218,7 +218,7 @@ services:
       - bigdata
     volumes:
       - ./:/app
-    restart: unless-stopped
+    # restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -285,8 +285,11 @@ services:
       - bigdata
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/var/lib/grafana/dashboards
     environment:
-      - GF_INSTALL_PLUGINS=hadesarchitect-cassandra-datasource
+      - GF_PLUGINS_PREINSTALL=hadesarchitect-cassandra-datasource
       - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=hadesarchitect-cassandra-datasource
     restart: unless-stopped
     deploy:
