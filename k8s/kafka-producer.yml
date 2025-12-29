@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-producer
+  namespace: bigdata
+spec:
+  replicas: 0   # Manual start
+  selector:
+    matchLabels:
+      app: kafka-producer
+  template:
+    metadata:
+      labels:
+        app: kafka-producer
+    spec:
+      initContainers:
+        - name: wait-for-kafka
+          image: confluentinc/cp-kafka:7.5.1
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Kafka to be ready..."
+              until kafka-broker-api-versions --bootstrap-server kafka:9092 2>/dev/null; do
+                echo "Kafka not ready yet, waiting 10 seconds..."
+                sleep 10
+              done
+              echo "Kafka is ready!"
+              
+        - name: wait-for-hdfs
+          image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for HDFS namenode to be ready..."
+              until nc -z namenode 9870; do
+                echo "HDFS not ready yet, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "HDFS is ready!"
+              
+      containers:
+        - name: producer
+          image: python:3.10-slim
+          workingDir: /mnt/project
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: KAFKA_TOPIC
+              value: flights_topic
+          command:
+            - sh
+            - -c
+            - |
+              echo "Installing dependencies..."
+              pip install --no-cache-dir -r requirements.txt
+              echo "Starting Kafka producer..."
+              python kafka/kafka_producer.py
+          volumeMounts:
+            - name: project
+              mountPath: /mnt/project
+              readOnly: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: project
+          hostPath:
+            path: /mnt/myproject
+            type: Directory

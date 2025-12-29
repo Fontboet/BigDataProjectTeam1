@@ -97,6 +97,40 @@ Grafana:
 docker compose down
 ```
 
+# Kubernetes deployment
+## Instruction
+Using minikube :
+```bash
+minikube start
+kubectl apply -f k8s/namespace.yml
+kubectl apply -f k8s/
+kubectl get pods -n bigdata
+kubectl scale deployment kafka-producer -n bigdata --replicas=1 #start the producer
+```
+
+Equivalent of docker compose down :
+```bash
+kubectl delete -f k8s/
+# OR for the -v :
+kubectl delete namespace bigdata
+```
+
+## Useful commands
+| Command | Description |
+|--------|------------|
+| kubectl apply -f <file\|dir> | Deploy or update Kubernetes resources |
+| kubectl delete -f <file\|dir> | Delete Kubernetes resources |
+| kubectl get pods -n \<ns> | List pods |
+| kubectl describe pod \<pod> -n \<ns> | Detailed pod debugging |
+| kubectl logs \<pod> -n \<ns> | View pod logs |
+| kubectl exec -it \<pod> -n \<ns> -- bash | Open a shell inside a pod |
+| kubectl get svc -n \<ns> | List services |
+| kubectl get pvc -n \<ns> | List persistent volumes |
+| kubectl rollout restart deploy \<name> -n \<ns> | Restart a deployment |
+| kubectl config set-context --current --namespace=\<ns> | Set default namespace |
+
+
+
 # Configs
 ## Kafka
 Short guide to choose Kafka producer settings (tradeoffs + examples).

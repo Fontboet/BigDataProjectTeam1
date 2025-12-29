@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-init
+  namespace: bigdata
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-kafka
+          image: confluentinc/cp-kafka:7.5.1
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Kafka to be ready..."
+              until kafka-broker-api-versions --bootstrap-server kafka:9092 2>/dev/null; do
+                echo "Kafka not ready yet, waiting 10 seconds..."
+                sleep 10
+              done
+              echo "Kafka is ready!"
+              sleep 10
+      containers:
+        - name: kafka-init
+          image: confluentinc/cp-kafka:7.5.1
+          command:
+            - sh
+            - -c
+            - |
+              echo "Creating Kafka topics..."
+              
+              kafka-topics --bootstrap-server kafka:9092 \
+                --create --if-not-exists \
+                --topic flights_topic \
+                --partitions 1 \
+                --replication-factor 1
+              
+              echo "Verifying topic creation..."
+              kafka-topics --bootstrap-server kafka:9092 --list
+              
+              echo "Topic created successfully!"

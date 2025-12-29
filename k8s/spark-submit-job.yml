@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: spark-submit
+  namespace: bigdata
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-spark-master
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Spark master to be ready..."
+              until nc -z spark-master 7077; do
+                echo "Spark master not ready yet, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "Spark master is ready!"
+        - name: wait-for-kafka
+          image: confluentinc/cp-kafka:7.5.1
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Kafka to be ready..."
+              until kafka-broker-api-versions --bootstrap-server kafka:9092 2>/dev/null; do
+                echo "Kafka not ready yet, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "Kafka is ready!"
+        - name: wait-for-cassandra
+          image: cassandra:4.1
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Cassandra to be ready..."
+              until cqlsh cassandra -e "DESCRIBE KEYSPACES" 2>/dev/null; do
+                echo "Cassandra not ready yet, waiting 5 seconds..."
+                sleep 5
+              done
+              echo "Cassandra is ready!"
+      containers:
+        - name: spark-submit
+          image: apache/spark:3.5.3
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: CASSANDRA_HOST
+              value: cassandra
+          command:
+            - sh
+            - -c
+            - |
+              echo "Starting Spark Streaming job..."
+              /opt/spark/bin/spark-submit \
+                --master spark://spark-master:7077 \
+                --deploy-mode client \
+                --conf spark.cassandra.connection.host=cassandra \
+                --conf spark.cassandra.connection.port=9042 \
+                --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector-assembly_2.12:3.5.0 \
+                /mnt/project/spark/streaming.py
+          volumeMounts:
+            - name: project
+              mountPath: /mnt/project
+              readOnly: true
+      volumes:
+        - name: project
+          hostPath:
+            path: /mnt/myproject
+            type: Directory

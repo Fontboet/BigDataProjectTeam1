@@ -1,0 +1,87 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cassandra-init
+  namespace: bigdata
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-cassandra
+          image: cassandra:4.1
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Cassandra to be ready..."
+              until cqlsh cassandra -e "DESCRIBE KEYSPACES" 2>/dev/null; do
+                echo "Cassandra not ready yet, waiting 10 seconds..."
+                sleep 10
+              done
+              echo "Cassandra is ready!"
+              sleep 10
+      containers:
+        - name: cassandra-init
+          image: cassandra:4.1
+          command:
+            - sh
+            - -c
+            - |
+              echo "Starting database initialization..."
+              
+              cqlsh cassandra -e "
+              CREATE KEYSPACE IF NOT EXISTS flights_db
+              WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+              "
+              
+              echo "Keyspace created, creating tables..."
+              
+              cqlsh cassandra -e "
+              USE flights_db;
+              
+              DROP TABLE IF EXISTS airline_stats;
+              CREATE TABLE airline_stats (
+                  airline text PRIMARY KEY,
+                  cancelled_flights int,
+                  on_time_flights int,
+                  delayed_flights int,
+                  avg_departure_delay float,
+                  avg_arrival_delay float,
+                  updated_at timestamp
+              );
+              
+              DROP TABLE IF EXISTS delay_by_reason;
+              CREATE TABLE delay_by_reason (
+                  delay_reason text PRIMARY KEY,
+                  count int,
+                  avg_duration float,
+                  updated_at timestamp
+              );
+              
+              DROP TABLE IF EXISTS route_stats;
+              CREATE TABLE route_stats (
+                  original_airport text,
+                  destination_airport text,
+                  original_city text,
+                  original_state text,
+                  destination_city text,
+                  destination_state text,
+                  original_latitude float,
+                  original_longitude float,
+                  avg_delay float,
+                  updated_at timestamp,
+                  PRIMARY KEY ((original_airport, destination_airport))
+              );
+              "
+              
+              echo "Tables created, creating indexes..."
+              
+              cqlsh cassandra -e "
+              USE flights_db;
+              CREATE INDEX IF NOT EXISTS route_stats_original_city_idx ON route_stats (original_city);
+              CREATE INDEX IF NOT EXISTS route_stats_destination_city_idx ON route_stats (destination_city);
+              "
+              
+              echo "Database initialization complete!"
