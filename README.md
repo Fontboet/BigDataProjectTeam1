@@ -102,11 +102,12 @@ docker compose down
 Using minikube :
 ```bash
 minikube start
-kubectl apply -f k8s/namespace.yml
-kubectl apply -f k8s/
-kubectl get pods -n bigdata
+./start.sh
+kubectl get pods -n bigdata #show pods status
 kubectl scale deployment kafka-producer -n bigdata --replicas=1 #start the producer
 ```
+
+Interrupting the start.sh file will also delete the namespace created, thus it is not needed to do the following steps if used this way.
 
 Equivalent of docker compose down :
 ```bash
