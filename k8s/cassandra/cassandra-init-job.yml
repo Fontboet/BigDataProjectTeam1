@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cassandra-init
+  namespace: bigdata
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: cassandra-init
+          image: cassandra:4.1
+          command:
+            - bash
+            - -lc
+            - |
+              set -e
+
+              echo "Waiting for Cassandra to be ready..."
+              until cqlsh cassandra 9042 -e "DESCRIBE KEYSPACES" >/dev/null 2>&1; do
+                sleep 2
+              done
+              echo "Cassandra is ready!"
+
+              echo "Running init script..."
+              cqlsh cassandra 9042 -f /mnt/myproject/cassandra/init_cassandra.cql
+
+              echo "Cassandra initialization complete!"
+          volumeMounts:
+            - name: project
+              mountPath: /mnt/myproject
+
+      volumes:
+        - name: project
+          hostPath:
+            path: /mnt/myproject
+            type: Directory

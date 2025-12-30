@@ -43,6 +43,13 @@ spec:
             initialDelaySeconds: 120
             periodSeconds: 15
             failureThreshold: 10
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: "500m"
+        limits:
+          memory: "1.5Gi"
+          cpu: "1"
   volumeClaimTemplates:
     - metadata:
         name: cassandra-data

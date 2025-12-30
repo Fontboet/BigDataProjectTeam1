@@ -107,13 +107,18 @@ kubectl get pods -n bigdata #show pods status
 kubectl scale deployment kafka-producer -n bigdata --replicas=1 #start the producer
 ```
 
-Interrupting the start.sh file will also delete the namespace created, thus it is not needed to do the following steps if used this way.
+Interrupting the start.sh file will also delete the namespace created, thus it is not needed to do the following steps if used this way. Also, please note that it is much slower than it was with Docker compose.
 
 Equivalent of docker compose down :
 ```bash
 kubectl delete -f k8s/
 # OR for the -v :
 kubectl delete namespace bigdata
+```
+
+You can give more ressources to minikube, for example :
+```bash
+minikube start --cpus=4 --memory=4096
 ```
 
 ## Useful commands

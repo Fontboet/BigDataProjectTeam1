@@ -1,0 +1,72 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: spark-submit
+  namespace: bigdata
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+
+      initContainers:
+        - name: wait-for-spark
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z spark-master 7077; do sleep 5; done"]
+
+        - name: wait-for-kafka
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z kafka 9092; do sleep 5; done"]
+
+        - name: wait-for-hdfs
+          image: apache/hadoop:3.3.6
+          command:
+            - bash
+            - -c
+            - |
+              echo "Waiting for HDFS to be ready..."
+              until hdfs dfsadmin -safemode get | grep -q OFF; do
+                sleep 5
+              done
+              echo "HDFS is ready"
+
+        - name: wait-for-cassandra
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z cassandra 9042; do sleep 5; done"]
+
+      containers:
+        - name: spark-submit
+          image: apache/spark:3.5.3
+          command:
+            - /opt/spark/bin/spark-submit
+            - --master
+            - spark://spark-master:7077
+            - --deploy-mode
+            - client
+            - --conf
+            - spark.driver.bindAddress=0.0.0.0
+            - --conf
+            - spark.driver.host=$(POD_IP)
+            - --conf
+            - spark.executor.memory=1g
+            - --conf
+            - spark.driver.memory=1g
+            - --conf
+            - spark.jars.ivy=/tmp/.ivy
+            - --packages
+            - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector-assembly_2.12:3.5.0
+            - /mnt/myproject/spark/streaming.py
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          volumeMounts:
+            - name: project
+              mountPath: /mnt/myproject
+
+      volumes:
+        - name: project
+          hostPath:
+            path: /mnt/myproject
+            type: Directory

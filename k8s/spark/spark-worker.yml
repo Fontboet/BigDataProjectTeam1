@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: spark-submit
+  namespace: bigdata
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+
+      initContainers:
+        - name: wait-for-spark
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z spark-master 7077; do sleep 5; done
+
+      containers:
+        - name: spark-submit
+          image: apache/spark:3.5.3
+          command:
+            - /opt/spark/bin/spark-submit
+            - --master
+            - spark://spark-master:7077
+            - --deploy-mode
+            - cluster
+            - --conf
+            - spark.executor.memory=1g
+            - --conf
+            - spark.driver.memory=1g
+            - --conf
+            - spark.jars.ivy=/tmp/.ivy
+            - --packages
+            - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector-assembly_2.12:3.5.0
+            - /app/streaming.py
+          volumeMounts:
+            - name: app
+              mountPath: /app
+            - name: project
+              mountPath: /mnt/myproject
+              type: Directory
+      volumes:
+        - name: app
+          configMap:
+            name: spark-app

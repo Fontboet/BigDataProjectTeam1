@@ -92,8 +92,8 @@ flights_df = raw_flights_df \
 flights_df.printSchema()
 
 # Load reference data
-airport_df = spark.read.csv('data/airports.csv', header=True, inferSchema=True)
-airline_df = spark.read.csv('data/airlines.csv', header=True, inferSchema=True)
+airport_df = spark.read.csv('/mnt/myproject/data/airports.csv', header=True, inferSchema=True)
+airline_df = spark.read.csv('/mnt/myproject/data/airlines.csv', header=True, inferSchema=True)
 
 airline_df = airline_df.withColumnRenamed("AIRLINE", "AIRLINES")
 
@@ -250,18 +250,6 @@ def write_delay_stats(batch_df, batch_id):
             .save()
     except Exception as e:
         print(f"Error writing delay_stats: {e}")
-
-def write_delay_stats(batch_df, batch_id):
-    print(f"Writing delay_stats batch {batch_id} - {batch_df.count()} rows")
-
-    batch_df = batch_df.withColumn("updated_at", current_timestamp())
-
-    batch_df.write \
-        .format("org.apache.spark.sql.cassandra") \
-        .mode("append") \
-        .options(table="delay_by_reason", keyspace="flights_db") \
-        .option("spark.cassandra.output.consistency.level", "LOCAL_QUORUM") \
-        .save()
 
 def write_route_stats(batch_df, batch_id):
     print(f"Writing route_stats batch {batch_id} - {batch_df.count()} rows")

@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hdfs
+  namespace: bigdata
+spec:
+  selector:
+    app: hdfs
+  ports:
+    - name: rpc
+      port: 9000
+      targetPort: 9000
+    - name: web
+      port: 9870
+      targetPort: 9870
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hdfs
+  namespace: bigdata
+spec:
+  serviceName: hdfs
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hdfs
+  template:
+    metadata:
+      labels:
+        app: hdfs
+    spec:
+      containers:
+        - name: hdfs
+          image: apache/hadoop:3.3.6
+          command:
+            - bash
+            - -c
+            - |
+              if [ ! -d /hadoop/dfs/name/current ]; then
+                echo "Formatting HDFS (one-time)"
+                hdfs namenode -format -force
+              fi
+
+              hdfs namenode &
+              hdfs datanode &
+
+              tail -f /dev/null
+          ports:
+            - containerPort: 9000
+            - containerPort: 9870
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+          volumeMounts:
+            - name: hdfs-data
+              mountPath: /hadoop/dfs
+  volumeClaimTemplates:
+    - metadata:
+        name: hdfs-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

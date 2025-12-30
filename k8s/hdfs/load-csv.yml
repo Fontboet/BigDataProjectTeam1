@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: load-csv
+  namespace: bigdata
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: loader
+          image: apache/hadoop:3.3.6
+          command:
+            - bash
+            - -c
+            - |
+              hdfs dfs -mkdir -p /data
+              hdfs dfs -put /input/*.csv /data
+          volumeMounts:
+            - name: input
+              mountPath: /input
+      volumes:
+        - name: input
+          configMap:
+            name: csv-data
