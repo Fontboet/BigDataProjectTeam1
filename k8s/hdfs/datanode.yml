@@ -1,10 +1,9 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: datanode
   namespace: bigdata
 spec:
-  serviceName: datanode
   replicas: 1
   selector:
     matchLabels:
@@ -14,29 +13,39 @@ spec:
       labels:
         app: datanode
     spec:
+      hostname: datanode
       containers:
         - name: datanode
           image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-          command:
-            - /bin/bash
-            - -c
-            - hdfs datanode &
           ports:
-            - containerPort: 9864
+            - containerPort: 9866
+          env:
+            - name: SERVICE_PRECONDITION
+              value: "namenode:9000"
+          envFrom:
+            - configMapRef:
+                name: hadoop-env
+          resources:
+            limits:
+              cpu: "1"
+              memory: "2Gi"
           volumeMounts:
-            - name: hdfs-config
-              mountPath: /opt/hadoop/etc/hadoop
-            - name: datanode-data
+            - name: hadoop-datanode
               mountPath: /hadoop/dfs/data
       volumes:
-        - name: hdfs-config
-          configMap:
-            name: hdfs-config
-  volumeClaimTemplates:
-    - metadata:
-        name: datanode-data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 5Gi
+        - name: hadoop-datanode
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datanode
+  namespace: bigdata
+spec:
+  selector:
+    app: datanode
+  ports:
+    - name: data
+      port: 9866
+      targetPort: 9866
+  type: ClusterIP

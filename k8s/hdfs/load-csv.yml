@@ -1,65 +1,50 @@
-# apiVersion: batch/v1
-# kind: Job
-# metadata:
-#   name: hdfs-load-csv
-#   namespace: bigdata
-# spec:
-#   backoffLimit: 3
-#   template:
-#     spec:
-#       restartPolicy: OnFailure
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hdfs-load-csv
+  namespace: bigdata
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: load-csv
+          image: apache/hadoop:3.3.6
+          env:
+            - name: HADOOP_CONF_DIR
+              value: /etc/hadoop
+            - name: HADOOP_USER_NAME
+              value: hdfs
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
 
-#       containers:
-#         - name: load-csv
-#           image: apache/hadoop:3.3.6
-#           env:
-#             - name: HADOOP_CONF_DIR
-#               value: /etc/hadoop
-#             - name: HADOOP_USER_NAME
-#               value: hadoop
-#           command:
-#             - /bin/bash
-#             - -c
-#             - |
-#               set -e
+              echo "Waiting for HDFS safemode OFF..."
+              until hdfs dfsadmin -safemode get | grep -q OFF; do
+                sleep 5
+              done
 
-#               echo "Checking Hadoop configuration"
-#               hdfs getconf -confKey fs.defaultFS
+              TARGET_DIR=/data/input
 
-#               echo "Waiting for HDFS safemode OFF..."
-#               until hdfs dfsadmin -safemode get | grep -q OFF; do
-#                 sleep 10
-#               done
+              hdfs dfs -mkdir -p ${TARGET_DIR}
+              hdfs dfs -put -f /mnt/data/*.csv ${TARGET_DIR}/
 
-#               TARGET_DIR=/data/input
-
-#               if hdfs dfs -test -e ${TARGET_DIR}/airlines.csv; then
-#                 echo "CSV already loaded"
-#                 exit 0
-#               fi
-
-#               echo "Creating HDFS directory"
-#               hdfs dfs -mkdir -p ${TARGET_DIR}
-
-#               echo "Uploading CSV files"
-#               hdfs dfs -put /mnt/data/*.csv ${TARGET_DIR}/
-
-#               echo "DONE"
-
-#           volumeMounts:
-#             - name: hadoop-conf
-#               mountPath: /etc/hadoop
-#               readOnly: true
-#             - name: project-data
-#               mountPath: /mnt/data
-#               readOnly: true
-
-#       volumes:
-#         - name: hadoop-conf
-#           configMap:
-#             name: hadoop-config
-
-#         - name: project-data
-#           hostPath:
-#             path: /mnt/myproject/data
-#             type: Directory
+              echo "CSV loaded successfully"
+          volumeMounts:
+            - name: hadoop-conf
+              mountPath: /etc/hadoop
+              readOnly: true
+            - name: project-data
+              mountPath: /mnt/data
+              readOnly: true
+      volumes:
+        - name: hadoop-conf
+          configMap:
+            name: hadoop-config
+        - name: project-data
+          hostPath:
+            path: /mnt/myproject/data
+            type: Directory

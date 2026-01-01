@@ -1,10 +1,9 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: namenode
   namespace: bigdata
 spec:
-  serviceName: namenode
   replicas: 1
   selector:
     matchLabels:
@@ -14,34 +13,39 @@ spec:
       labels:
         app: namenode
     spec:
+      hostname: namenode
       containers:
         - name: namenode
-          image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-          command:
-            - /bin/bash
-            - -c
-            - |
-              if [ ! -d /hadoop/dfs/name/current ]; then
-                hdfs namenode -format -force;
-              fi
-              hdfs namenode &
+          image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
           ports:
-            - containerPort: 9000
             - containerPort: 9870
+            - containerPort: 9000
+          env:
+            - name: CLUSTER_NAME
+              value: "test"
+          envFrom:
+            - configMapRef:
+                name: hadoop-env
           volumeMounts:
-            - name: hdfs-config
-              mountPath: /opt/hadoop/etc/hadoop
-            - name: namenode-data
+            - name: hadoop-namenode
               mountPath: /hadoop/dfs/name
       volumes:
-        - name: hdfs-config
-          configMap:
-            name: hdfs-config
-  volumeClaimTemplates:
-    - metadata:
-        name: namenode-data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 5Gi
+        - name: hadoop-namenode
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: namenode
+  namespace: bigdata
+spec:
+  selector:
+    app: namenode
+  ports:
+    - name: web
+      port: 9870
+      targetPort: 9870
+    - name: rpc
+      port: 9000
+      targetPort: 9000
+  type: ClusterIP

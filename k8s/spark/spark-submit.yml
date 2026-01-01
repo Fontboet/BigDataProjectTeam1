@@ -25,7 +25,7 @@ spec:
             - -c
             - |
               echo "Waiting for HDFS..."
-              until nc -z hdfs-0.hdfs.bigdata.svc.cluster.local 9000; do
+              until nc -z namenode.company.bigdata.svc.cluster.local 9000; do
                 sleep 2
               done
 
@@ -73,7 +73,6 @@ spec:
           volumeMounts:
             - name: project
               mountPath: /mnt/myproject
-
       volumes:
         - name: project
           hostPath:

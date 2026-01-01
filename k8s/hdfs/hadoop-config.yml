@@ -1,29 +1,15 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: hdfs-config
+  name: hadoop-env
   namespace: bigdata
 data:
-  core-site.xml: |
-    <configuration>
-      <property>
-        <name>fs.defaultFS</name>
-        <value>hdfs://namenode:9000</value>
-      </property>
-    </configuration>
-
-  hdfs-site.xml: |
-    <configuration>
-      <property>
-        <name>dfs.replication</name>
-        <value>2</value>
-      </property>
-      <property>
-        <name>dfs.namenode.name.dir</name>
-        <value>/hadoop/dfs/name</value>
-      </property>
-      <property>
-        <name>dfs.datanode.data.dir</name>
-        <value>/hadoop/dfs/data</value>
-      </property>
-    </configuration>
+  CORE_CONF_fs_defaultFS: "hdfs://namenode:9000"
+  CORE_CONF_hadoop_http_staticuser_user: "root"
+  CORE_CONF_hadoop_proxyuser_hue_hosts: "*"
+  CORE_CONF_hadoop_proxyuser_hue_groups: "*"
+  CORE_CONF_io_compression_codecs: "org.apache.hadoop.io.compress.SnappyCodec"
+  HDFS_CONF_dfs_replication: "1"
+  HDFS_CONF_dfs_webhdfs_enabled: "true"
+  HDFS_CONF_dfs_permissions_enabled: "false"
+  HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check: "false"
