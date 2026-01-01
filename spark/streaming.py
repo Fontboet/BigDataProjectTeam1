@@ -8,6 +8,8 @@ spark = SparkSession.builder \
     .appName("flights_stream") \
     .config("spark.cassandra.connection.host", os.environ.get("CASSANDRA_HOST", "cassandra")) \
     .config("spark.cassandra.connection.port", os.environ.get("CASSANDRA_PORT", "9042")) \
+    .config("spark.sql.shuffle.partitions", "8") \
+    .config("spark.streaming.backpressure.enabled", "true") \
     .getOrCreate()
 
 # Kafka source
@@ -89,11 +91,27 @@ flights_df = raw_flights_df \
     .withColumn("LATE_AIRCRAFT_DELAY", col("LATE_AIRCRAFT_DELAY").cast(IntegerType())) \
     .withColumn("WEATHER_DELAY", col("WEATHER_DELAY").cast(IntegerType()))
 
-flights_df.printSchema()
 
-# Load reference data
-airport_df = spark.read.csv('data/airports.csv', header=True, inferSchema=True)
-airline_df = spark.read.csv('data/airlines.csv', header=True, inferSchema=True)
+flights_df = flights_df.withColumn(
+    "flight_timestamp",
+    F.to_timestamp(
+        F.concat_ws(
+            "-", 
+            col("YEAR"), 
+            F.lpad(col("MONTH"), 2, "0"),
+            F.lpad(col("DAY"), 2, "0")
+        ),
+        "yyyy-MM-dd"
+    )
+)
+flights_df.printSchema()
+# Drop columns not needed for analysis
+flights_df = flights_df.drop("YEAR", "MONTH", "DAY", "DAY_OF_WEEK", "FLIGHT_NUMBER", "TAIL_NUMBER", "ARRIVAL_TIME", "DEPARTURE_TIME")
+# Load static data
+airport_df = spark.read.csv('data/airports.csv', header=True, inferSchema=True).cache()
+airline_df = spark.read.csv('data/airlines.csv', header=True, inferSchema=True).cache()
+airport_df.count()  # Trigger cache
+airline_df.count()  # Trigger cache
 
 airline_df = airline_df.withColumnRenamed("AIRLINE", "AIRLINES")
 
