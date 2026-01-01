@@ -1,48 +1,44 @@
-apiVersion: batch/v1
-kind: Job
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: spark-submit
+  name: spark-worker
   namespace: bigdata
 spec:
-  backoffLimit: 0
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-worker
   template:
+    metadata:
+      labels:
+        app: spark-worker
     spec:
-      restartPolicy: Never
-
-      initContainers:
-        - name: wait-for-spark
-          image: busybox:1.36
+      containers:
+        - name: spark-worker
+          image: apache/spark:3.5.3
           command:
             - sh
             - -c
             - |
-              until nc -z spark-master 7077; do sleep 5; done
-
-      containers:
-        - name: spark-submit
-          image: apache/spark:3.5.3
-          command:
-            - /opt/spark/bin/spark-submit
-            - --master
-            - spark://spark-master:7077
-            - --deploy-mode
-            - cluster
-            - --conf
-            - spark.executor.memory=1g
-            - --conf
-            - spark.driver.memory=1g
-            - --conf
-            - spark.jars.ivy=/tmp/.ivy
-            - --packages
-            - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector-assembly_2.12:3.5.0
-            - /app/streaming.py
+              /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker \
+              spark://spark-master:7077 \
+              --memory 1G \
+              --cores 1
+          ports:
+            - containerPort: 8081
+          resources:
+            requests:
+              memory: "768Mi"
+              cpu: "500m"
+            limits:
+              memory: "1.5Gi"
+              cpu: "1"
           volumeMounts:
-            - name: app
-              mountPath: /app
             - name: project
-              mountPath: /mnt/myproject
-              type: Directory
+              mountPath: /mnt/project
+              readOnly: true
       volumes:
-        - name: app
-          configMap:
-            name: spark-app
+        - name: project
+          hostPath:
+            path: /mnt/myproject
+            type: Directory

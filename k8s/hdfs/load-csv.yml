@@ -1,25 +1,65 @@
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: load-csv
-  namespace: bigdata
-spec:
-  template:
-    spec:
-      restartPolicy: OnFailure
-      containers:
-        - name: loader
-          image: apache/hadoop:3.3.6
-          command:
-            - bash
-            - -c
-            - |
-              hdfs dfs -mkdir -p /data
-              hdfs dfs -put /input/*.csv /data
-          volumeMounts:
-            - name: input
-              mountPath: /input
-      volumes:
-        - name: input
-          configMap:
-            name: csv-data
+# apiVersion: batch/v1
+# kind: Job
+# metadata:
+#   name: hdfs-load-csv
+#   namespace: bigdata
+# spec:
+#   backoffLimit: 3
+#   template:
+#     spec:
+#       restartPolicy: OnFailure
+
+#       containers:
+#         - name: load-csv
+#           image: apache/hadoop:3.3.6
+#           env:
+#             - name: HADOOP_CONF_DIR
+#               value: /etc/hadoop
+#             - name: HADOOP_USER_NAME
+#               value: hadoop
+#           command:
+#             - /bin/bash
+#             - -c
+#             - |
+#               set -e
+
+#               echo "Checking Hadoop configuration"
+#               hdfs getconf -confKey fs.defaultFS
+
+#               echo "Waiting for HDFS safemode OFF..."
+#               until hdfs dfsadmin -safemode get | grep -q OFF; do
+#                 sleep 10
+#               done
+
+#               TARGET_DIR=/data/input
+
+#               if hdfs dfs -test -e ${TARGET_DIR}/airlines.csv; then
+#                 echo "CSV already loaded"
+#                 exit 0
+#               fi
+
+#               echo "Creating HDFS directory"
+#               hdfs dfs -mkdir -p ${TARGET_DIR}
+
+#               echo "Uploading CSV files"
+#               hdfs dfs -put /mnt/data/*.csv ${TARGET_DIR}/
+
+#               echo "DONE"
+
+#           volumeMounts:
+#             - name: hadoop-conf
+#               mountPath: /etc/hadoop
+#               readOnly: true
+#             - name: project-data
+#               mountPath: /mnt/data
+#               readOnly: true
+
+#       volumes:
+#         - name: hadoop-conf
+#           configMap:
+#             name: hadoop-config
+
+#         - name: project-data
+#           hostPath:
+#             path: /mnt/myproject/data
+#             type: Directory

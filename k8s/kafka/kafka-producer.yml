@@ -26,19 +26,6 @@ spec:
               done
               echo "Kafka is ready!"
 
-        - name: wait-for-hdfs
-          image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
-          command:
-            - sh
-            - -c
-            - |
-              echo "Waiting for HDFS namenode to be ready..."
-              until nc -z namenode 9870; do
-                echo "HDFS not ready yet, waiting 5 seconds..."
-                sleep 5
-              done
-              echo "HDFS is ready!"
-
       containers:
         - name: producer
           image: python:3.10-slim

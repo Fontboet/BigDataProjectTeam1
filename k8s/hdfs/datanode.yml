@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: datanode
+  namespace: bigdata
+spec:
+  serviceName: datanode
+  replicas: 1
+  selector:
+    matchLabels:
+      app: datanode
+  template:
+    metadata:
+      labels:
+        app: datanode
+    spec:
+      containers:
+        - name: datanode
+          image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+          command:
+            - /bin/bash
+            - -c
+            - hdfs datanode &
+          ports:
+            - containerPort: 9864
+          volumeMounts:
+            - name: hdfs-config
+              mountPath: /opt/hadoop/etc/hadoop
+            - name: datanode-data
+              mountPath: /hadoop/dfs/data
+      volumes:
+        - name: hdfs-config
+          configMap:
+            name: hdfs-config
+  volumeClaimTemplates:
+    - metadata:
+        name: datanode-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

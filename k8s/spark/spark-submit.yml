@@ -24,11 +24,20 @@ spec:
             - bash
             - -c
             - |
-              echo "Waiting for HDFS to be ready..."
-              until hdfs dfsadmin -safemode get | grep -q OFF; do
-                sleep 5
+              echo "Waiting for HDFS..."
+              until nc -z hdfs-0.hdfs.bigdata.svc.cluster.local 9000; do
+                sleep 2
               done
-              echo "HDFS is ready"
+
+              TARGET_DIR=/data/input
+
+              echo "Waiting for CSV files to be loaded into HDFS..."
+              until hdfs dfs -test -e ${TARGET_DIR}/airports.csv; 
+              do
+                sleep 10
+              done
+              echo "CSV are loaded"
+              exit 0
 
         - name: wait-for-cassandra
           image: busybox:1.36
