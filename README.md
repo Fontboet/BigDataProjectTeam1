@@ -67,7 +67,11 @@ Validate delay_by_reason:
 docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, delay_reason, count, avg_duration
 FROM flights_db.delay_by_reason;\""
 ```
-
+Validate hourly_stats:
+```bash
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, scheduled_hour, flight_count, avg_delay
+FROM flights_db.hourly_stats;\""
+```
 Confirm HDFS cluster status :
 ```bash
 docker exec -it namenode hdfs dfsadmin -report

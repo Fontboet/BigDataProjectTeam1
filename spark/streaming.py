@@ -1,8 +1,9 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, current_timestamp, when, sum as _sum, avg, count
+from pyspark.sql.functions import from_json, col, current_timestamp, when, sum as _sum, avg, count, stddev, percentile_approx
 from pyspark.sql.types import StructType, StringType, IntegerType, StructField
 import pyspark.sql.functions as F
 import os
+import sys
 
 spark = SparkSession.builder \
     .appName("flights_stream") \
@@ -11,6 +12,8 @@ spark = SparkSession.builder \
     .config("spark.sql.shuffle.partitions", "8") \
     .config("spark.streaming.backpressure.enabled", "true") \
     .getOrCreate()
+
+CHECKPOINT_BASE = os.environ.get("CHECKPOINT_DIR", "/tmp/checkpoint")
 
 # Kafka source
 kafka_flights_df = (spark.readStream.format("kafka")
@@ -24,7 +27,6 @@ kafka_flights_df = (spark.readStream.format("kafka")
 print("Kafka source created")
 
 # Define schema as ALL Strings first to ensure parsing succeeds, then cast
-# This handles cases where JSON values are strings (e.g. from csv.DictReader)
 flights_schema = StructType([
     StructField("YEAR", StringType()),
     StructField("MONTH", StringType()),
@@ -62,7 +64,7 @@ flights_schema = StructType([
 # Parse JSON
 raw_flights_df = kafka_flights_df.select(from_json(col("value").cast("string"), flights_schema).alias("data")).select("data.*")
 
-# Cast to correct types and handle empty strings (which become null on cast)
+# Cast to correct types
 flights_df = raw_flights_df \
     .withColumn("YEAR", col("YEAR").cast(IntegerType())) \
     .withColumn("MONTH", col("MONTH").cast(IntegerType())) \
@@ -91,7 +93,7 @@ flights_df = raw_flights_df \
     .withColumn("LATE_AIRCRAFT_DELAY", col("LATE_AIRCRAFT_DELAY").cast(IntegerType())) \
     .withColumn("WEATHER_DELAY", col("WEATHER_DELAY").cast(IntegerType()))
 
-
+# Create flight timestamp and extract scheduled hour for time series
 flights_df = flights_df.withColumn(
     "flight_timestamp",
     F.to_timestamp(
@@ -103,15 +105,25 @@ flights_df = flights_df.withColumn(
         ),
         "yyyy-MM-dd"
     )
+).withColumn(
+    "scheduled_hour", 
+    (col("SCHEDULED_DEPARTURE") / 100).cast(IntegerType())
 )
+
+# Watermarking: Handle late-arriving data (2-day tolerance)
+flights_df = flights_df.withWatermark("flight_timestamp", "2 days")
+print("Watermarking applied: 2 days late data tolerance")
+
 flights_df.printSchema()
+
 # Drop columns not needed for analysis
 flights_df = flights_df.drop("YEAR", "MONTH", "DAY", "DAY_OF_WEEK", "FLIGHT_NUMBER", "TAIL_NUMBER", "ARRIVAL_TIME", "DEPARTURE_TIME")
+
 # Load static data
 airport_df = spark.read.csv('data/airports.csv', header=True, inferSchema=True).cache()
 airline_df = spark.read.csv('data/airlines.csv', header=True, inferSchema=True).cache()
-airport_df.count()  # Trigger cache
-airline_df.count()  # Trigger cache
+airport_df.count()
+airline_df.count()
 
 airline_df = airline_df.withColumnRenamed("AIRLINE", "AIRLINES")
 
@@ -148,7 +160,6 @@ flights_airlines_airports_df = flights_airlines_airports_df.join(
     "left"
 )
 
-# 1. Airline performance
 airline_stats = flights_airlines_airports_df \
     .filter(col("AIRLINE").isNotNull()) \
     .groupBy("AIRLINE") \
@@ -169,7 +180,6 @@ airline_stats_out = airline_stats.select(
     col("avg_arrival_delay")
 )
 
-# 2. Delay by Reason Analysis
 delay_cols = ["AIR_SYSTEM_DELAY", "SECURITY_DELAY", "AIRLINE_DELAY", "LATE_AIRCRAFT_DELAY", "WEATHER_DELAY"]
 
 delay_df = flights_airlines_airports_df.filter(
@@ -198,7 +208,6 @@ delay_stats_out = delay_stats.select(
     col("avg_duration")
 )
 
-# 3. Route analysis
 route_stats = flights_airlines_airports_df \
     .filter(col("ORIGIN_AIRPORT").isNotNull() & col("DESTINATION_AIRPORT").isNotNull()) \
     .groupBy(
@@ -222,24 +231,54 @@ route_stats_out = route_stats.select(
     col("avg_delay")
 )
 
-import sys
+# =============================================================================
+# HOURLY TIME SERIES ANALYSIS
+# =============================================================================
+hourly_stats = flights_airlines_airports_df \
+    .filter(
+        col("scheduled_hour").isNotNull() & 
+        (col("scheduled_hour") >= 0) & 
+        (col("scheduled_hour") <= 23)
+    ) \
+    .groupBy("scheduled_hour") \
+    .agg(
+        count("*").alias("flight_count"),
+        avg("DEPARTURE_DELAY").alias("avg_delay"),
+        stddev("DEPARTURE_DELAY").alias("stddev_delay"),
+        percentile_approx("DEPARTURE_DELAY", 0.5).alias("median_delay"),
+        percentile_approx("DEPARTURE_DELAY", 0.95).alias("p95_delay"),
+        _sum(when(col("CANCELLED") == 1, 1).otherwise(0)).alias("cancelled_count"),
+        _sum(when(col("DEPARTURE_DELAY") > 15, 1).otherwise(0)).alias("delayed_count")
+    )
 
-# Monitoring function
+hourly_stats_out = hourly_stats.select(
+    col("scheduled_hour"),
+    col("flight_count"),
+    col("avg_delay"),
+    col("stddev_delay"),
+    col("median_delay"),
+    col("p95_delay"),
+    col("cancelled_count"),
+    col("delayed_count")
+)
+
+# =============================================================================
+# WRITE FUNCTIONS
+# =============================================================================
+
 def check_data_quality(batch_df, batch_id):
-    # This runs on the raw stream (after parsing)
     total = batch_df.count()
     if total > 0:
         null_airline = batch_df.filter(col("AIRLINE").isNull()).count()
         null_delay = batch_df.filter(col("DEPARTURE_DELAY").isNull()).count()
         print(f"DQ Check Batch {batch_id}: Total={total}, NullAirline={null_airline}, NullDepDelay={null_delay}")
         print("Sample Data:")
-        batch_df.select("AIRLINE", "DEPARTURE_DELAY").show(5, truncate=False)
+        batch_df.select("AIRLINE", "DEPARTURE_DELAY", "scheduled_hour").show(5, truncate=False)
         sys.stdout.flush()
     else:
         print(f"DQ Check Batch {batch_id}: Empty batch")
         sys.stdout.flush()
 
-# Write functions
 def write_airline_stats(batch_df, batch_id):
     print(f"Writing airline_stats batch {batch_id} - {batch_df.count()} rows")
     sys.stdout.flush()
@@ -254,9 +293,11 @@ def write_airline_stats(batch_df, batch_id):
             .save()
     except Exception as e:
         print(f"Error writing airline_stats: {e}")
+        sys.stdout.flush()
 
 def write_delay_stats(batch_df, batch_id):
     print(f"Writing delay_stats batch {batch_id} - {batch_df.count()} rows")
+    sys.stdout.flush()
     if batch_df.isEmpty(): return
     try:
         batch_df = batch_df.withColumn("updated_at", current_timestamp())
@@ -268,9 +309,11 @@ def write_delay_stats(batch_df, batch_id):
             .save()
     except Exception as e:
         print(f"Error writing delay_stats: {e}")
+        sys.stdout.flush()
 
 def write_route_stats(batch_df, batch_id):
     print(f"Writing route_stats batch {batch_id} - {batch_df.count()} rows")
+    sys.stdout.flush()
     if batch_df.isEmpty(): return
     try:
         batch_df = batch_df.withColumn("updated_at", current_timestamp())
@@ -282,30 +325,67 @@ def write_route_stats(batch_df, batch_id):
             .save()
     except Exception as e:
         print(f"Error writing route_stats: {e}")
+        sys.stdout.flush()
 
-# Start queries
-# Add a monitoring query on the raw data
+def write_hourly_stats(batch_df, batch_id):
+    print(f"Writing hourly_stats batch {batch_id} - {batch_df.count()} rows")
+    sys.stdout.flush()
+    if batch_df.isEmpty(): return
+    try:
+        batch_df = batch_df.withColumn("updated_at", current_timestamp())
+        batch_df.write \
+            .format("org.apache.spark.sql.cassandra") \
+            .mode("append") \
+            .options(table="hourly_stats", keyspace="flights_db") \
+            .option("spark.cassandra.output.consistency.level", "LOCAL_QUORUM") \
+            .save()
+    except Exception as e:
+        print(f"Error writing hourly_stats: {e}")
+        sys.stdout.flush()
+
+# =============================================================================
+# START STREAMING QUERIES WITH CHECKPOINTING
+# =============================================================================
+print("Starting streaming queries with checkpointing for exactly-once semantics...")
+
+# Data quality monitoring
 dq_query = flights_df.writeStream \
     .foreachBatch(check_data_quality) \
+    .option("checkpointLocation", f"{CHECKPOINT_BASE}/dq") \
     .trigger(processingTime="10 seconds") \
     .start()
 
+# Airline stats
 query1 = airline_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_airline_stats) \
+    .option("checkpointLocation", f"{CHECKPOINT_BASE}/airline_stats") \
     .trigger(processingTime="10 seconds") \
     .start()
 
+# Delay stats
 query2 = delay_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_delay_stats) \
+    .option("checkpointLocation", f"{CHECKPOINT_BASE}/delay_stats") \
     .trigger(processingTime="10 seconds") \
     .start()
 
+# Route stats
 query3 = route_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_route_stats) \
+    .option("checkpointLocation", f"{CHECKPOINT_BASE}/route_stats") \
     .trigger(processingTime="10 seconds") \
     .start()
 
+# Hourly time series stats
+query4 = hourly_stats_out.writeStream \
+    .outputMode("complete") \
+    .foreachBatch(write_hourly_stats) \
+    .option("checkpointLocation", f"{CHECKPOINT_BASE}/hourly_stats") \
+    .trigger(processingTime="10 seconds") \
+    .start()
+
+print(f"Started {len(spark.streams.active)} streaming queries")
 spark.streams.awaitAnyTermination()
