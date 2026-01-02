@@ -111,10 +111,6 @@ flights_df = flights_df.withColumn(
     (col("SCHEDULED_DEPARTURE") / 100).cast(IntegerType())
 )
 
-# Watermarking: Handle late-arriving data (2-day tolerance)
-flights_df = flights_df.withWatermark("flight_timestamp", "2 days")
-print("Watermarking applied: 2 days late data tolerance")
-
 flights_df.printSchema()
 
 # Drop columns not needed for analysis
@@ -214,7 +210,7 @@ route_stats = flights_airlines_airports_df \
     .groupBy(
         "ORIGIN_AIRPORT", "DESTINATION_AIRPORT",
         "ORIGIN_CITY", "ORIGIN_STATE", "ORIGIN_LATITUDE", "ORIGIN_LONGITUDE",
-        "DESTINATION_CITY", "DESTINATION_STATE"
+        "DESTINATION_CITY", "DESTINATION_STATE", "DESTINATION_LATITUDE", "DESTINATION_LONGITUDE"
     ) \
     .agg(
         avg("ARRIVAL_DELAY").alias("avg_delay")
@@ -229,44 +225,39 @@ route_stats_out = route_stats.select(
     col("DESTINATION_STATE").alias("destination_state"),
     col("ORIGIN_LATITUDE").alias("original_latitude"),
     col("ORIGIN_LONGITUDE").alias("original_longitude"),
+    col("DESTINATION_LATITUDE").alias("destination_latitude"),
+    col("DESTINATION_LONGITUDE").alias("destination_longitude"),
     col("avg_delay")
 )
 
-# =============================================================================
-# HOURLY TIME SERIES ANALYSIS
-# =============================================================================
-hourly_stats = flights_airlines_airports_df \
-    .filter(
-        col("scheduled_hour").isNotNull() & 
-        (col("scheduled_hour") >= 0) & 
-        (col("scheduled_hour") <= 23)
-    ) \
-    .groupBy("scheduled_hour") \
-    .agg(
-        count("*").alias("flight_count"),
-        avg("DEPARTURE_DELAY").alias("avg_delay"),
-        stddev("DEPARTURE_DELAY").alias("stddev_delay"),
-        percentile_approx("DEPARTURE_DELAY", 0.5).alias("median_delay"),
-        percentile_approx("DEPARTURE_DELAY", 0.95).alias("p95_delay"),
-        _sum(when(col("CANCELLED") == 1, 1).otherwise(0)).alias("cancelled_count"),
-        _sum(when(col("DEPARTURE_DELAY") > 15, 1).otherwise(0)).alias("delayed_count")
-    )
+# # Time series hourly stats
+# hourly_delay_trend = flights_airlines_airports_df \
+#     .filter(col("ARRIVAL_DELAY").isNotNull()) \
+#     .withWatermark("flight_timestamp", "30 minutes") \
+#     .groupBy(
+#         F.window("flight_timestamp", "1 hour")
+#     ) \
+#     .agg(
+#         count("*").alias("flight_count"),
+#         avg("ARRIVAL_DELAY").alias("avg_delay"),
+#         # stddev("ARRIVAL_DELAY").alias("stddev_delay"),
+#         # percentile_approx("ARRIVAL_DELAY", 0.5).alias("median_delay"),
+#         # _sum(when(col("CANCELLED") == 1, 1).otherwise(0)).alias("cancelled_count"),
+#         # _sum(when(col("ARRIVAL_DELAY") > 15, 1).otherwise(0)).alias("delayed_count")
+#     )
 
-hourly_stats_out = hourly_stats.select(
-    col("scheduled_hour"),
-    col("flight_count"),
-    col("avg_delay"),
-    col("stddev_delay"),
-    col("median_delay"),
-    col("p95_delay"),
-    col("cancelled_count"),
-    col("delayed_count")
-)
+# hourly_delay_trend_out = hourly_delay_trend.select(
+#     col("window.start").alias("window_start"),
+#     col("window.end").alias("window_end"),
+#     col("flight_count"),
+#     col("avg_delay"),
+#     # col("stddev_delay"),
+#     # col("median_delay"),
+#     # col("cancelled_count"),
+#     # col("delayed_count")
+# )
 
-# =============================================================================
-# WRITE FUNCTIONS
-# =============================================================================
-
+# Write functions for foreachBatch
 def check_data_quality(batch_df, batch_id):
     total = batch_df.count()
     if total > 0:
@@ -328,25 +319,25 @@ def write_route_stats(batch_df, batch_id):
         print(f"Error writing route_stats: {e}")
         sys.stdout.flush()
 
-def write_hourly_stats(batch_df, batch_id):
-    print(f"Writing hourly_stats batch {batch_id} - {batch_df.count()} rows")
-    sys.stdout.flush()
-    if batch_df.isEmpty(): return
-    try:
-        batch_df = batch_df.withColumn("updated_at", current_timestamp())
-        batch_df.write \
-            .format("org.apache.spark.sql.cassandra") \
-            .mode("append") \
-            .options(table="hourly_stats", keyspace="flights_db") \
-            .option("spark.cassandra.output.consistency.level", "LOCAL_QUORUM") \
-            .save()
-    except Exception as e:
-        print(f"Error writing hourly_stats: {e}")
-        sys.stdout.flush()
+# def write_hourly_delay_trend(batch_df, batch_id):
+#     print(f"Writing hourly_delay_trend batch {batch_id} - {batch_df.count()} rows")
+#     sys.stdout.flush()
 
-# =============================================================================
-# START STREAMING QUERIES WITH CHECKPOINTING
-# =============================================================================
+#     if batch_df.isEmpty():
+#         return
+
+#     try:
+#         batch_df = batch_df.withColumn("updated_at", current_timestamp())
+#         batch_df.write \
+#             .format("org.apache.spark.sql.cassandra") \
+#             .mode("append") \
+#             .options(table="hourly_delay_trend", keyspace="flights_db") \
+#             .option("spark.cassandra.output.consistency.level", "LOCAL_QUORUM") \
+#             .save()
+#     except Exception as e:
+#         print(f"Error writing hourly_delay_trend: {e}")
+#         sys.stdout.flush()
+
 print("Starting streaming queries with checkpointing for exactly-once semantics...")
 
 # Data quality monitoring
@@ -383,13 +374,13 @@ query3 = route_stats_out.writeStream \
     .option("checkpointLocation", "/tmp/checkpoints/route") \
     .start()
 
-# Hourly time series stats
-query4 = hourly_stats_out.writeStream \
-    .outputMode("complete") \
-    .foreachBatch(write_hourly_stats) \
-    .option("checkpointLocation", f"{CHECKPOINT_BASE}/hourly_stats") \
-    .trigger(processingTime="10 seconds") \
-    .start()
+# query4 = hourly_delay_trend_out.writeStream \
+#     .outputMode("append") \
+#     .foreachBatch(write_hourly_delay_trend) \
+#     .option("checkpointLocation", f"{CHECKPOINT_BASE}/hourly_delay_trend") \
+#     .trigger(processingTime="10 seconds") \
+#     .start()
+
 
 # # Archival writings of the enriched flight data to HDFS
 # query5 = flights_airlines_airports_df.writeStream \
