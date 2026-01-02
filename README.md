@@ -45,7 +45,7 @@ docker compose up -d spark-submit
 Watch logs:
 ```bash
 docker compose logs spark-submit --no-log-prefix | tail -n 300
-docker compose logs spark-submit --no-log-prefix | grep -E "Kafka source created|Writing airline_stats|Writing route_stats|Writing delay_stats" | tail -n 50
+docker compose logs spark-submit --no-log-prefix | grep -E "Kafka source created|Writing airline_stats|Writing route_stats|Writing delay_stats|Writing hourly_delay_trend" | tail -n 50
 ```
 Spark shows “Kafka source created” and connector jars downloading/resolved.
 Validate Cassandra schema and counts:
@@ -67,11 +67,6 @@ Validate delay_by_reason:
 docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, delay_reason, count, avg_duration
 FROM flights_db.delay_by_reason;\""
 ```
-Validate hourly_stats:
-```bash
-docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, scheduled_hour, flight_count, avg_delay
-FROM flights_db.hourly_stats;\""
-```
 Confirm HDFS cluster status :
 ```bash
 docker exec -it namenode hdfs dfsadmin -report
@@ -83,10 +78,6 @@ Grafana:
     - Open http://localhost:3000 (default admin/admin)
     - Install Cassandra datasource plugin is auto-enabled
     - Add datasource: type "Apache Cassandra", contact point `cassandra:9042`, keyspace `flights_db`
-    - Create dashboards:
-      * Time-series: query editor with SELECT airline, total_flights, updated_at FROM flights_db.airline_stats WHERE updated_at > $__timeFrom AND updated_at < $__timeTo
-      * Table: SELECT * FROM flights_db.route_stats LIMIT 20
-      * Aggregations: SELECT airline, avg_departure_delay, avg_arrival_delay FROM flights_db.airline_stats
     - Set refresh every 5s to observe streaming updates
 
 ## Data Mapping
