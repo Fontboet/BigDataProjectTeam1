@@ -92,8 +92,8 @@ flights_df = raw_flights_df \
 flights_df.printSchema()
 
 # Load reference data
-airport_df = spark.read.csv('/mnt/myproject/data/airports.csv', header=True, inferSchema=True)
-airline_df = spark.read.csv('/mnt/myproject/data/airlines.csv', header=True, inferSchema=True)
+airport_df = spark.read.csv('/app/data/smallcsv/airports.csv', header=True, inferSchema=True)
+airline_df = spark.read.csv('/app/data/smallcsv/airlines.csv', header=True, inferSchema=True)
 
 airline_df = airline_df.withColumnRenamed("AIRLINE", "AIRLINES")
 
@@ -276,30 +276,56 @@ query1 = airline_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_airline_stats) \
     .trigger(processingTime="10 seconds") \
-    .option("checkpointLocation", "hdfs://namenode:9000/checkpoint/airline") \
+    .option("checkpointLocation", "/tmp/checkpoints/airline") \
     .start()
 
 query2 = delay_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_delay_stats) \
     .trigger(processingTime="10 seconds") \
-    .option("checkpointLocation", "hdfs://namenode:9000/checkpoint/delay") \
+    .option("checkpointLocation", "/tmp/checkpoints/delay") \
     .start()
 
 query3 = route_stats_out.writeStream \
     .outputMode("complete") \
     .foreachBatch(write_route_stats) \
     .trigger(processingTime="10 seconds") \
-    .option("checkpointLocation", "hdfs://namenode:9000/checkpoint/route") \
+    .option("checkpointLocation", "/tmp/checkpoints/route") \
     .start()
+
+
+'''
+The following streaming writes to HDFS and have been disabled for testing, as HDFS is causing some troubles.
+'''
+
+# query1 = airline_stats_out.writeStream \
+#     .outputMode("complete") \
+#     .foreachBatch(write_airline_stats) \
+#     .trigger(processingTime="10 seconds") \
+#     .option("checkpointLocation", "hdfs://namenode:9000/checkpoint/airline") \
+#     .start()
+
+# query2 = delay_stats_out.writeStream \
+#     .outputMode("complete") \
+#     .foreachBatch(write_delay_stats) \
+#     .trigger(processingTime="10 seconds") \
+#     .option("checkpointLocation", "hdfs://namenode:9000/checkpoint/delay") \
+#     .start()
+
+# query3 = route_stats_out.writeStream \
+#     .outputMode("complete") \
+#     .foreachBatch(write_route_stats) \
+#     .trigger(processingTime="10 seconds") \
+#     .option("checkpointLocation", "hdfs://namenode:9000/checkpoint/route") \
+#     .start()
 
 # Archival writings of the enriched flight data to HDFS
-query4 = flights_airlines_airports_df.writeStream \
-    .outputMode("append") \
-    .format("parquet") \
-    .option("path", "hdfs://namenode:9000/flights") \
-    .option("checkpointLocation", "hdfs://namenode:9000/checkpoint/flights") \
-    .trigger(processingTime="10 seconds") \
-    .start()
+# query4 = flights_airlines_airports_df.writeStream \
+#     .outputMode("append") \
+#     .format("parquet") \
+#     .option("path", "hdfs://namenode:9000/flights") \
+#     .option("checkpointLocation", "hdfs://namenode:9000/checkpoint/flights") \
+#     .trigger(processingTime="10 seconds") \
+#     .start()
 
-query4.awaitTermination()
+query3.awaitTermination()

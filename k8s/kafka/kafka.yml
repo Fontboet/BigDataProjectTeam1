@@ -4,6 +4,7 @@ metadata:
   name: kafka
   namespace: bigdata
 spec:
+  clusterIP: None
   ports:
     - port: 9092
       name: kafka

@@ -13,19 +13,24 @@ spec:
       labels:
         app: spark-master
     spec:
-      enableServiceLinks: false
       containers:
         - name: spark-master
           image: apache/spark:3.5.3
           command:
-            - /opt/spark/bin/spark-class
-            - org.apache.spark.deploy.master.Master
-            - --host
-            - 0.0.0.0
+            - /opt/spark/sbin/start-master.sh
             - --port
             - "7077"
             - --webui-port
             - "8080"
+          env:
+            - name: SPARK_MASTER_HOST
+              value: "0.0.0.0"
+            - name: SPARK_MASTER_PORT
+              value: "7077"
+            - name: SPARK_MASTER_WEBUI_PORT
+              value: "8080"
+            - name: SPARK_NO_DAEMONIZE
+              value: "true"
           ports:
             - containerPort: 7077
             - containerPort: 8080
@@ -41,5 +46,7 @@ spec:
   ports:
     - name: spark
       port: 7077
+      targetPort: 7077
     - name: webui
       port: 8080
+      targetPort: 8080

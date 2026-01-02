@@ -1,14 +1,3 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: grafana
-  namespace: bigdata
-spec:
-  ports:
-    - port: 3000
-  selector:
-    app: grafana
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,10 +18,8 @@ spec:
           image: grafana/grafana:latest
           ports:
             - containerPort: 3000
-      resources:
-        requests:
-          memory: "128Mi"
-          cpu: "100m"
-        limits:
-          memory: "256Mi"
-          cpu: "250m"
+          env:
+            - name: GF_PLUGINS_PREINSTALL
+              value: hadesarchitect-cassandra-datasource
+            - name: GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS
+              value: hadesarchitect-cassandra-datasource

@@ -17,26 +17,22 @@ spec:
         - name: spark-worker
           image: apache/spark:3.5.3
           command:
-            - sh
-            - -c
-            - |
-              /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker \
-              spark://spark-master:7077 \
-              --memory 1G \
-              --cores 1
+            - /opt/spark/sbin/start-worker.sh
+            - spark://spark-master:7077
+            - --webui-port
+            - "8081"
+            - --cores
+            - "2"
+            - --memory
+            - 2G
+          env:
+            - name: SPARK_NO_DAEMONIZE
+              value: "true"
           ports:
             - containerPort: 8081
-          resources:
-            requests:
-              memory: "768Mi"
-              cpu: "500m"
-            limits:
-              memory: "1.5Gi"
-              cpu: "1"
           volumeMounts:
             - name: project
-              mountPath: /mnt/project
-              readOnly: true
+              mountPath: /app
       volumes:
         - name: project
           hostPath:
