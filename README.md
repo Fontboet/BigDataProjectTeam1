@@ -67,7 +67,11 @@ Validate delay_by_reason:
 docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, delay_reason, count, avg_duration
 FROM flights_db.delay_by_reason;\""
 ```
-
+Validate hourly_stats:
+```bash
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, scheduled_hour, flight_count, avg_delay
+FROM flights_db.hourly_stats;\""
+```
 Confirm HDFS cluster status :
 ```bash
 docker exec -it namenode hdfs dfsadmin -report
@@ -103,39 +107,24 @@ Using minikube :
 ```bash
 minikube start
 ./start.sh
-kubectl get pods -n bigdata #show pods status
-kubectl scale deployment kafka-producer -n bigdata --replicas=1 #start the producer
+```
+To see how the process are going :
+```bash
+kubectl get pods -n bigdata # show pods status
+kubectl logs {deployment, job}/{deployement name, job name}
 ```
 
-Interrupting the start.sh file will also delete the namespace created, thus it is not needed to do the following steps if used this way. Also, please note that it is much slower than it was with Docker compose.
+Interrupting the start.sh file will also delete the namespace created, thus it is not needed to do the following steps if used this way.
 
 Equivalent of docker compose down :
 ```bash
 kubectl delete -f k8s/
-# OR for the -v :
-kubectl delete namespace bigdata
 ```
 
 You can give more ressources to minikube, for example :
 ```bash
 minikube start --cpus=4 --memory=4096
 ```
-
-## Useful commands
-| Command | Description |
-|--------|------------|
-| kubectl apply -f <file\|dir> | Deploy or update Kubernetes resources |
-| kubectl delete -f <file\|dir> | Delete Kubernetes resources |
-| kubectl get pods -n \<ns> | List pods |
-| kubectl describe pod \<pod> -n \<ns> | Detailed pod debugging |
-| kubectl logs \<pod> -n \<ns> | View pod logs |
-| kubectl exec -it \<pod> -n \<ns> -- bash | Open a shell inside a pod |
-| kubectl get svc -n \<ns> | List services |
-| kubectl get pvc -n \<ns> | List persistent volumes |
-| kubectl rollout restart deploy \<name> -n \<ns> | Restart a deployment |
-| kubectl config set-context --current --namespace=\<ns> | Set default namespace |
-
-
 
 # Configs
 ## Kafka

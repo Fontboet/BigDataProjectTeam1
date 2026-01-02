@@ -34,8 +34,8 @@ kubectl config set-context --current --namespace=bigdata
 echo ""
 echo "Loading Kubernetes configurations..."
 kubectl apply -R -f k8s/
-
 echo "✅ Mount started (PID: $MOUNT_PID)"
+
 echo ""
 echo "==============================="
 echo " Big Data Project"
@@ -43,19 +43,17 @@ echo "==============================="
 echo ""
 echo "Instructions:"
 echo "---"
-echo "- Manually start the producer :"
-echo "  kubectl apply -f k8s/kafka/kafka-producer-job.yml"
-echo "To access the Grafana dashboard, run:"
-echo "  kubectl port-forward -n bigdata svc/grafana 3000:3000"
-echo "  -Then open http://localhost:3000 in your browser."
+echo "- Grafana dashboard acess :"
+# echo "  Run kubectl port-forward svc/grafana 3000:3000"
+echo "  Open http://localhost:3000"
 echo "  Default credentials: admin / admin"
-echo "  Note that you can forward other services similarly by changing the service name and ports."
+echo "- Note that you can forward other services similarly using this command"
 echo "---"
-echo "Minikube IP: $(minikube ip)"
 echo ""
 echo "⚠️  Keep this terminal open!"
 echo ""
 echo "To stop: Ctrl+C"
 
+sleep 15 && kubectl port-forward svc/grafana 3000:3000 &
 
 wait $MOUNT_PID

@@ -36,3 +36,16 @@ CREATE TABLE flights_db.route_stats (
 
 CREATE INDEX IF NOT EXISTS ON flights_db.route_stats (original_city);
 CREATE INDEX IF NOT EXISTS ON flights_db.route_stats (destination_city);
+
+DROP TABLE IF EXISTS flights_db.hourly_stats;
+CREATE TABLE IF NOT EXISTS flights_db.hourly_stats (
+    scheduled_hour INT PRIMARY KEY,
+    flight_count BIGINT,
+    avg_delay DOUBLE,
+    stddev_delay DOUBLE,
+    median_delay DOUBLE,
+    p95_delay DOUBLE,
+    cancelled_count BIGINT,
+    delayed_count BIGINT,
+    updated_at TIMESTAMP
+);
