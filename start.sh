@@ -34,6 +34,9 @@ kubectl config set-context --current --namespace=bigdata
 echo ""
 echo "Loading Kubernetes configurations..."
 kubectl apply -R -f k8s/
+kubectl create configmap grafana-dashboard \
+  --from-file=./grafana/dashboard.json \
+  -n bigdata
 echo "✅ Mount started (PID: $MOUNT_PID)"
 
 echo ""
@@ -47,25 +50,26 @@ echo "- Grafana dashboard acess :"
 # echo "  Run kubectl port-forward svc/grafana 3000:3000"
 echo "  Open http://localhost:3000"
 echo "  Default credentials: admin / admin"
-echo "- Note that you can forward other services similarly using this command"
+# echo "- Note that you can forward other services similarly using this command"
 # echo "- If the auto-forwarding does not work, you can run this command :"
 # echo "  kubectl port-forward svc/grafana 3000:3000"
+echo "⚠️  Keep this terminal open!"
 echo "---"
 echo ""
-echo "⚠️  Keep this terminal open!"
+echo "To stop use Ctrl+C"
 echo ""
-echo "To stop: Ctrl+C"
 
+echo "Starting port-forwarding for Grafana..."
+for i in {1..24}; do
+  kubectl port-forward -n bigdata svc/grafana 3000:3000 >/dev/null 2>&1 &
+  FWD_PID=$!
+  sleep 5
+  if kill -0 $FWD_PID 2>/dev/null; then
+    echo "Port-forward Grafana OK"
+    wait $MOUNT_PID
+  fi
+done
 
-
-sleep 15 && kubectl port-forward -n bigdata svc/grafana 3000:3000 >/dev/null 2>&1 &
-FWD_PID=$!
-
-sleep 5
-
-if ! kill -0 $FWD_PID 2>/dev/null; then
-  echo "Grafana port-forward  failed, please start it when the container is ready with: "
-  echo "kubectl port-forward -n bigdata svc/grafana 3000:3000"
-fi
-
-wait $MOUNT_PID
+echo "Grafana port-forward failed after 2 minutes."
+echo "Please start it manually with:"
+echo "kubectl port-forward -n bigdata svc/grafana 3000:3000"

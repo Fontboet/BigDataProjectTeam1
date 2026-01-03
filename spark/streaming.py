@@ -13,10 +13,12 @@ spark = SparkSession.builder \
     .config("spark.streaming.backpressure.enabled", "true") \
     .getOrCreate()
 
-# CHECKPOINT_BASE = os.environ.get("CHECKPOINT_DIR", "/tmp/checkpoint")
-CHECKPOINT_BASE = "hdfs://namenode-0.namenode.bigdata.svc.cluster.local:8020/checkpoint"
+CHECKPOINT_BASE = os.environ.get("CHECKPOINT_DIR", "/tmp/checkpoint")
+# CHECKPOINT_BASE = "hdfs://namenode-0.namenode.bigdata.svc.cluster.local:8020/checkpoint"
+
 # Test HDFS connectivity
-spark.read.text('hdfs://namenode-0.namenode.bigdata.svc.cluster.local:8020/').count()
+if CHECKPOINT_BASE.startswith("hdfs://"):
+    spark.read.text('hdfs://namenode-0.namenode.bigdata.svc.cluster.local:8020/').count()
 
 # Kafka source
 kafka_flights_df = (spark.readStream.format("kafka")
@@ -392,13 +394,14 @@ query4 = hourly_stats_out.writeStream \
     .start()
 
 # # Archival writings of the enriched flight data to HDFS
-query5 = flights_airlines_airports_df.writeStream \
-    .outputMode("append") \
-    .format("parquet") \
-    .option("path", "hdfs://namenode:9000/flights") \
-    .option("checkpointLocation", f"{CHECKPOINT_BASE}/flights") \
-    .trigger(processingTime="10 seconds") \
-    .start()
+if CHECKPOINT_BASE.startswith("hdfs://"):
+    query5 = flights_airlines_airports_df.writeStream \
+        .outputMode("append") \
+        .format("parquet") \
+        .option("path", "hdfs://namenode:9000/flights") \
+        .option("checkpointLocation", f"{CHECKPOINT_BASE}/flights") \
+        .trigger(processingTime="10 seconds") \
+        .start()
 
 print(f"Started {len(spark.streams.active)} streaming queries")
 spark.streams.awaitAnyTermination()

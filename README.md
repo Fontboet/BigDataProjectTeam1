@@ -120,6 +120,11 @@ You can give more ressources to minikube, for example :
 minikube start --cpus=4 --memory=4096
 ```
 
+Or you can forward a port if you want to access an UI for example :
+```bash
+kubectl port-forward -n bigdata svc/<service> <port>:<port>
+```
+
 # Configs
 ## Kafka
 Short guide to choose Kafka producer settings (tradeoffs + examples).
