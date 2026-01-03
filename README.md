@@ -75,10 +75,11 @@ Check HDFS Web UI : http://localhost:9870
 
 
 Grafana:
-    - Open http://localhost:3000 (default admin/admin)
-    - Install Cassandra datasource plugin is auto-enabled
-    - Add datasource: type "Apache Cassandra", contact point `cassandra:9042`, keyspace `flights_db`
-    - Set refresh every 5s to observe streaming updates
+    - Open http://localhost:3000 (default admin/admin) \
+    <!-- - Install Cassandra datasource plugin is auto-enabled \ -->
+    - Add datasource: type "Apache Cassandra", contact point `cassandra:9042`, keyspace `flights_db` \
+    - Set refresh every 5s to observe streaming updates \
+    - <u>Note</u> : it works the same with **k8s**
 
 ## Data Mapping
 - CSV -> Kafka: `kafka/kafka_producer.py` reads `data/flights.csv` and sends JSON per row
@@ -94,7 +95,7 @@ docker compose down
 
 # Kubernetes deployment
 ## Instruction
-Using minikube :
+Using **minikube** :
 ```bash
 minikube start
 ./start.sh
@@ -106,6 +107,8 @@ kubectl logs {deployment, job}/{deployement name, job name}
 ```
 
 Interrupting the start.sh file will also delete the namespace created, thus it is not needed to do the following steps if used this way.
+
+### Useful informations
 
 Equivalent of docker compose down :
 ```bash

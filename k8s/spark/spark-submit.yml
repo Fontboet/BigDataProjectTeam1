@@ -12,18 +12,26 @@ spec:
     spec:
       restartPolicy: OnFailure
       # initContainers:
-      #   - name: wait-for-hdfs
-      #     image: apache/spark:3.5.3
-      #     command:
-      #       - bash
-      #       - -c
-      #       - |
-      #         echo "Waiting for HDFS namenode..."
-      #         until hdfs dfs -ls hdfs://namenode:9000/ >/dev/null 2>&1; do
-      #           echo "HDFS not ready yet..."
-      #           sleep 5
-      #         done
-      #         echo "HDFS is ready!"
+      # - name: wait-for-hdfs
+      #   image: bde2020/hadoop-base:2.0.0-hadoop3.2.1-java8
+      #   volumeMounts:
+      #     - name: hadoop-conf
+      #       mountPath: /etc/hadoop
+      #   command:
+      #     - bash
+      #     - -c
+      #     - |
+      #       echo "Waiting for HDFS (max 3 tries)..."
+      #       for i in $(seq 1 3); do
+      #         echo "Attempt $i/3"
+      #         if hdfs dfsadmin -safemode get | grep -q "OFF"; then
+      #           echo "HDFS is ready"
+      #           exit 0
+      #         fi
+      #         sleep 20
+      #       done
+      #       echo "HDFS not ready after 1 minute, restarting."
+      #       exit 1
       containers:
         - name: spark-submit
           image: apache/spark:3.5.3
@@ -32,18 +40,43 @@ spec:
             - bash
             - -c
             - |
-              mkdir -p /tmp/.ivy2/cache /tmp/.ivy2/jars && \
-              /opt/spark/bin/spark-submit \
-              --master spark://spark-master:7077 \
-              --deploy-mode client \
-              --conf spark.driver.host=spark-submit \
-              --conf spark.driver.bindAddress=0.0.0.0 \
-              --conf spark.driver.port=44487 \
-              --conf spark.driver.blockManager.port=44488 \
-              --conf spark.sql.shuffle.partitions=4 \
-              --conf spark.jars.ivy=/tmp/.ivy2 \
-              --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector-assembly_2.12:3.5.0 \
-              /app/spark/streaming.py
+              echo "==================================="
+              echo "Starting Spark streaming with infinite retry"
+              echo "==================================="
+              echo ""
+
+              mkdir -p /tmp/.ivy2/cache /tmp/.ivy2/jars
+
+              while true; do
+                /opt/spark/bin/spark-submit \
+                --master spark://spark-master:7077 \
+                --deploy-mode client \
+                --conf spark.driver.host=spark-submit \
+                --conf spark.driver.bindAddress=0.0.0.0 \
+                --conf spark.driver.port=44487 \
+                --conf spark.driver.blockManager.port=44488 \
+                --conf spark.sql.shuffle.partitions=4 \
+                --conf spark.jars.ivy=/tmp/.ivy2 \
+                --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector-assembly_2.12:3.5.0 \
+                /app/spark/streaming.py
+
+                EXIT_CODE=$?
+
+                if [ "$EXIT_CODE" -eq 0 ]; then
+                  echo "-----------------------------------"
+                  echo "Spark submit ended successfully."
+                  echo "Exiting..."
+                  echo "-----------------------------------"
+                  exit 0
+                else
+                  echo "-----------------------------------"
+                  echo "Spark submit failed with exit code ${EXIT_CODE}."
+                  echo "Restarting in 20 seconds..."
+                  echo "-----------------------------------"
+                  sleep 20
+                fi
+              done
+
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: kafka:9092
@@ -65,6 +98,9 @@ spec:
           hostPath:
             path: /mnt/myproject
             type: Directory
+        - name: hadoop-conf
+          configMap:
+            name: hadoop-conf
         - name: ivy
           emptyDir: {}
         - name: checkpoints

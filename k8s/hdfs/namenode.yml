@@ -1,51 +1,89 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: namenode
-  namespace: bigdata
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: namenode
-  template:
-    metadata:
-      labels:
-        app: namenode
-    spec:
-      hostname: namenode
-      containers:
-        - name: namenode
-          image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
-          ports:
-            - containerPort: 9870
-            - containerPort: 9000
-          env:
-            - name: CLUSTER_NAME
-              value: "test"
-          envFrom:
-            - configMapRef:
-                name: hadoop-env
-          volumeMounts:
-            - name: hadoop-namenode
-              mountPath: /hadoop/dfs/name
-      volumes:
-        - name: hadoop-namenode
-          emptyDir: {}
----
 apiVersion: v1
 kind: Service
 metadata:
   name: namenode
   namespace: bigdata
+  labels:
+    app.kubernetes.io/name: namenode
+    app.kubernetes.io/version: "1.0"
 spec:
-  selector:
-    app: namenode
   ports:
-    - name: web
-      port: 9870
-      targetPort: 9870
-    - name: rpc
-      port: 9000
-      targetPort: 9000
+    - port: 8020
+      protocol: TCP
+      name: nn-rpc
+    - port: 9870
+      protocol: TCP
+      name: nn-web
+  selector:
+    app.kubernetes.io/name: namenode
+    app.kubernetes.io/version: "1.0"
   type: ClusterIP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: namenode
+  namespace: bigdata
+  labels:
+    app.kubernetes.io/name: namenode
+    app.kubernetes.io/version: "1.0"
+spec:
+  serviceName: namenode
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: namenode
+      app.kubernetes.io/version: "1.0"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: namenode
+        app.kubernetes.io/version: "1.0"
+    spec:
+      initContainers:
+      - name: delete-lost-found
+        image: busybox
+        command: ["sh", "-c", "rm -rf /hadoop/dfs/name/lost+found"]
+        volumeMounts:
+        - name: namenode-pv-claim
+          mountPath: /hadoop/dfs/name
+      containers:
+      - name: namenode
+        image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+        env:
+        - name: CLUSTER_NAME
+          value: hdfs-k8s
+        - name: HDFS_CONF_dfs_permissions_enabled
+          value: "false"
+        ports:
+        - containerPort: 8020
+          name: nn-rpc
+        - containerPort: 9870
+          name: nn-web
+        startupProbe:
+          tcpSocket:
+            port: 8020
+          failureThreshold: 24
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: "500m"
+            memory: 1Gi
+          requests:
+            cpu: "500m"
+            memory: 1Gi
+        volumeMounts:
+        - name: namenode-pv-claim
+          mountPath: /hadoop/dfs/name
+      volumes:
+      - name: hadoop-conf
+        configMap:
+          name: hadoop-conf
+  volumeClaimTemplates:
+  - metadata:
+      name: namenode-pv-claim
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi

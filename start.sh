@@ -48,12 +48,24 @@ echo "- Grafana dashboard acess :"
 echo "  Open http://localhost:3000"
 echo "  Default credentials: admin / admin"
 echo "- Note that you can forward other services similarly using this command"
+# echo "- If the auto-forwarding does not work, you can run this command :"
+# echo "  kubectl port-forward svc/grafana 3000:3000"
 echo "---"
 echo ""
 echo "⚠️  Keep this terminal open!"
 echo ""
 echo "To stop: Ctrl+C"
 
-sleep 15 && kubectl port-forward svc/grafana 3000:3000 &
+
+
+sleep 15 && kubectl port-forward -n bigdata svc/grafana 3000:3000 >/dev/null 2>&1 &
+FWD_PID=$!
+
+sleep 5
+
+if ! kill -0 $FWD_PID 2>/dev/null; then
+  echo "Grafana port-forward  failed, please start it when the container is ready with: "
+  echo "kubectl port-forward -n bigdata svc/grafana 3000:3000"
+fi
 
 wait $MOUNT_PID
