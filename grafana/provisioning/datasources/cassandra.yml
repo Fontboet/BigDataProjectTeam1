@@ -5,8 +5,9 @@ datasources:
     type: hadesarchitect-cassandra-datasource
     access: proxy
     url: cassandra:9042
-    json_data:
-      keyspace: flights_db
-      consistency: ONE
     isDefault: true
     editable: true
+    jsonData:
+      keyspace: flights_db
+      user: ""
+      consistency: ONE
