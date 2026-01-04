@@ -1,6 +1,9 @@
 # Hanoi University of Science and Technology
 # BigDataProjectTeam1
 Big Data Storage and Processing 2025 Project Team 1
+<p align="center">
+  <img src="./image.png" alt="BigDataProjectTeam1 pipeline overview" width="800"/>
+</p>
 
 # Prerequisites 
 
