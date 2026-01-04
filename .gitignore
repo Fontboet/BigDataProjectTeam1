@@ -3,11 +3,11 @@ __pycache__/
 *.py[codz]
 *$py.class
 
-<<<<<<< HEAD
-=======
 # Spark
->>>>>>> spark
 spark/logs/
+
+# Kafka
+kafka/flights.csv
 
 # C extensions
 *.so

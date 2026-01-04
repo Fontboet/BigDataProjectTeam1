@@ -2,7 +2,64 @@
 # BigDataProjectTeam1
 Big Data Storage and Processing 2025 Project Team 1
 
-# How to Run the Pipeline
+# Prerequisites 
+
+For this project you will need :
+- Minikube
+- Docker
+- Download the dataset [here](https://www.kaggle.com/datasets/usdot/flight-delays/data?select=flights.csv), and place the CSV files into `./data`.
+
+
+# How to run the Kubernetes pipeline
+## Instruction
+
+Move the flights.csv file :
+```bash
+mv data/flights.csv kafka/
+```
+
+Using **minikube** :
+```bash
+minikube start \
+# You can specify with the following for example, or more (preferably)
+#   --cpus=4 \
+#   --memory=6000 \
+#   --disk-size=30g \
+#   --driver=docker
+```
+
+Start the deployment :
+
+```bash
+./start.sh
+```
+
+To see how the process are going :
+```bash
+kubectl get pods -n bigdata # show pods status
+kubectl logs {deployment, job}/{deployement name, job name}
+```
+
+Interrupting the start.sh file will also delete the namespace created, thus it is not needed to do the following steps if used this way.
+
+### Useful informations
+
+Equivalent of docker compose down :
+```bash
+kubectl delete -f k8s/
+```
+
+You can give more ressources to minikube, for example :
+```bash
+minikube start --cpus=4 --memory=4096
+```
+
+Or you can forward a port if you want to access an UI for example :
+```bash
+kubectl port-forward -n bigdata svc/<service> <port>:<port>
+```
+
+# How to Run the Docker Pipeline
 Start the stack:
 ```bash
 docker compose up -d
@@ -99,52 +156,6 @@ Grafana:
 docker compose down
 ```
 
-# Kubernetes deployment
-## Instruction
-Using **minikube** :
-```bash
-minikube start \
-  --cpus=4 \
-  --memory=4096 \
-  --disk-size=30g \
-  --driver=docker
-```
-Verify minikube is running
-```bash
-minikube status
-cd /BigDataProjectTeam1/k8s
-```
-```bash
-./start.sh
-```
-```bash
-chmod +x k8s/deploy.sh
-./k8s/deploy.sh
-```
-To see how the process are going :
-```bash
-kubectl get pods -n bigdata # show pods status
-kubectl logs {deployment, job}/{deployement name, job name}
-```
-
-Interrupting the start.sh file will also delete the namespace created, thus it is not needed to do the following steps if used this way.
-
-### Useful informations
-
-Equivalent of docker compose down :
-```bash
-kubectl delete -f k8s/
-```
-
-You can give more ressources to minikube, for example :
-```bash
-minikube start --cpus=4 --memory=4096
-```
-
-Or you can forward a port if you want to access an UI for example :
-```bash
-kubectl port-forward -n bigdata svc/<service> <port>:<port>
-```
 
 # Configs
 ## Kafka

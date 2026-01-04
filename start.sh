@@ -16,6 +16,12 @@ else
   echo "✅ Minikube is already running, continuing..."
 fi
 
+if [ -f "./kafka/flights.csv" ]; then
+    echo "✅ flights.csv file found, continuing..."
+else
+    echo "Please download the flights.csv file from Kaggle link in the README and place it in the ./kafka/ directory."
+fi
+
 
 # echo "📁 Mounting project directory..."
 # minikube mount "$(pwd)":/mnt/myproject &
@@ -30,12 +36,13 @@ echo "Loading namespace and setting default context..."
 kubectl apply -f k8s/namespace.yml
 kubectl config set-context --current --namespace=bigdata
 echo ""
+echo "Building Kafka producer Docker image..."
+eval $(minikube docker-env)
+docker build -t kafka-producer:latest ./kafka
+echo ""
 echo "Loading Kubernetes configurations..."
 kubectl create configmap spark-scripts \
   --from-file=streaming.py=./spark/streaming.py \
-  -n bigdata
-kubectl create configmap kafka-producer-script \
-  --from-file=kafka_producer.py=./kafka/kafka_producer.py \
   -n bigdata
 kubectl create configmap grafana-dashboard \
   --from-file=./grafana/dashboard.json \
@@ -44,9 +51,10 @@ kubectl create configmap cassandra-init-script \
   --from-file=init.cql=./cassandra/init_cassandra.cql \
   -n bigdata
 kubectl create configmap csv-data \
-  --from-file=airports.csv=./data/smallcsv/airports.csv \
-  --from-file=airlines.csv=./data/smallcsv/airlines.csv \
+  --from-file=airports.csv=./data/airports.csv \
+  --from-file=airlines.csv=./data/airlines.csv \
   -n bigdata
+  echo ""
 kubectl apply -R -f k8s/
 echo ""
 echo "==============================="
@@ -74,8 +82,12 @@ for i in {1..24}; do
   FWD_PID=$!
   sleep 5
   if kill -0 $FWD_PID 2>/dev/null; then
-    echo "Port-forward Grafana OK"
+    echo "Port-forward Grafana OK (PID $FWD_PID)"
     wait $FWD_PID
+    break
+  else
+    echo "Attempt $i failed, retrying..."
+    kill $FWD_PID 2>/dev/null
   fi
 done
 
