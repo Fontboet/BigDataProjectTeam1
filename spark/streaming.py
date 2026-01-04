@@ -14,11 +14,11 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 CHECKPOINT_BASE = os.environ.get("CHECKPOINT_DIR", "/tmp/checkpoint")
-CHECKPOINT_BASE = "hdfs://namenode-0.namenode.bigdata.svc.cluster.local:8020/checkpoint"
+# CHECKPOINT_BASE = "hdfs://namenode:8020/checkpoint"
 
 # Test HDFS connectivity
 if CHECKPOINT_BASE.startswith("hdfs://"):
-    spark.read.text('hdfs://namenode-0.namenode.bigdata.svc.cluster.local:8020/').count()
+    spark.read.text('hdfs://namenode:8020/').count()
 
 # Kafka source
 kafka_flights_df = (spark.readStream.format("kafka")
@@ -125,8 +125,8 @@ flights_df.printSchema()
 flights_df = flights_df.drop("YEAR", "MONTH", "DAY", "DAY_OF_WEEK", "FLIGHT_NUMBER", "TAIL_NUMBER", "ARRIVAL_TIME", "DEPARTURE_TIME")
 
 # Load static data
-airport_df = spark.read.csv('/app/data/smallcsv/airports.csv', header=True, inferSchema=True)
-airline_df = spark.read.csv('/app/data/smallcsv/airlines.csv', header=True, inferSchema=True)
+airport_df = spark.read.csv('file:///app/data/smallcsv/airports.csv', header=True, inferSchema=True)
+airline_df = spark.read.csv('file:///app/data/smallcsv/airlines.csv', header=True, inferSchema=True)
 airport_df.count()
 airline_df.count()
 
@@ -276,7 +276,7 @@ def check_data_quality(batch_df, batch_id):
     if total > 0:
         null_airline = batch_df.filter(col("AIRLINE").isNull()).count()
         null_delay = batch_df.filter(col("DEPARTURE_DELAY").isNull()).count()
-        print(f"DQ Check Batch {batch_id}: Total={total}, NullAirline={null_airline}, NullDepDelay={null_delay}")
+        print(f"DQ Check Batch {batch_id}: Total={total}, NullAirline={null_airline}, NullDepDelay={null_delay}")   
         print("Sample Data:")
         batch_df.select("AIRLINE", "DEPARTURE_DELAY", "scheduled_hour").show(5, truncate=False)
         sys.stdout.flush()
@@ -394,20 +394,21 @@ query4 = hourly_stats_out.writeStream \
     .start()
 
 # # Archival writings of the enriched flight data to HDFS
-try:
-    if CHECKPOINT_BASE.startswith("hdfs://"):
-        query5 = (
-            flights_airlines_airports_df.writeStream
-            .outputMode("append")
-            .format("parquet")
-            .option("path", "hdfs://namenode-0.namenode.bigdata.svc.cluster.local:8020/flights")
-            .option("checkpointLocation", f"{CHECKPOINT_BASE}/flights")
-            .trigger(processingTime="10 seconds")
-            .start()
-        )
-        print("Streaming query started successfully.")
-except Exception as e:
-    print(f"Error when trying to start query : {e}")
+# # Commented because too unstable to be used in "production"
+# try:
+#     if CHECKPOINT_BASE.startswith("hdfs://"):
+#         query5 = (
+#             flights_airlines_airports_df.writeStream
+#             .outputMode("append")
+#             .format("parquet")
+#             .option("path", "hdfs://namenode:8020/flights")
+#             .option("checkpointLocation", f"{CHECKPOINT_BASE}/flights")
+#             .trigger(processingTime="10 seconds")
+#             .start()
+#         )
+#         print("Streaming query started successfully.")
+# except Exception as e:
+#     print(f"Error when trying to start query : {e}")
 
 print(f"Started {len(spark.streams.active)} streaming queries")
 spark.streams.awaitAnyTermination()
