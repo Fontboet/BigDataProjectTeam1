@@ -27,7 +27,7 @@ docker compose logs kafka-init --no-log-prefix | tail -n 100
 ```
 Run producer manually if run first time:
 ```bash
-docker compose up -d producer
+docker compose --profile manual up -d producer
 ```
 Validate producer -> Kafka:
 ```bash
@@ -67,6 +67,12 @@ Validate delay_by_reason:
 docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, delay_reason, count, avg_duration
 FROM flights_db.delay_by_reason;\""
 ```
+Validate hourly_stats:
+```bash
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at,
+scheduled_hour, avg_delay
+FROM flights_db.hourly_stats;\""
+```
 Confirm HDFS cluster status :
 ```bash
 docker exec -it namenode hdfs dfsadmin -report
@@ -97,8 +103,23 @@ docker compose down
 ## Instruction
 Using **minikube** :
 ```bash
-minikube start
+minikube start \
+  --cpus=4 \
+  --memory=4096 \
+  --disk-size=30g \
+  --driver=docker
+```
+Verify minikube is running
+```bash
+minikube status
+cd /BigDataProjectTeam1/k8s
+```
+```bash
 ./start.sh
+```
+```bash
+chmod +x k8s/deploy.sh
+./k8s/deploy.sh
 ```
 To see how the process are going :
 ```bash

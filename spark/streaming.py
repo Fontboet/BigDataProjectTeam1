@@ -125,8 +125,8 @@ flights_df.printSchema()
 flights_df = flights_df.drop("YEAR", "MONTH", "DAY", "DAY_OF_WEEK", "FLIGHT_NUMBER", "TAIL_NUMBER", "ARRIVAL_TIME", "DEPARTURE_TIME")
 
 # Load static data
-airport_df = spark.read.csv('file:///app/data/smallcsv/airports.csv', header=True, inferSchema=True)
-airline_df = spark.read.csv('file:///app/data/smallcsv/airlines.csv', header=True, inferSchema=True)
+airport_df = spark.read.csv('/app/data/airports.csv', header=True, inferSchema=True)
+airline_df = spark.read.csv('/app/data/airlines.csv', header=True, inferSchema=True)
 airport_df.count()
 airline_df.count()
 
@@ -218,7 +218,7 @@ route_stats = flights_airlines_airports_df \
     .groupBy(
         "ORIGIN_AIRPORT", "DESTINATION_AIRPORT",
         "ORIGIN_CITY", "ORIGIN_STATE", "ORIGIN_LATITUDE", "ORIGIN_LONGITUDE",
-        "DESTINATION_CITY", "DESTINATION_STATE"
+        "DESTINATION_CITY", "DESTINATION_STATE", "DESTINATION_LATITUDE", "DESTINATION_LONGITUDE"
     ) \
     .agg(
         avg("ARRIVAL_DELAY").alias("avg_delay")
@@ -233,6 +233,8 @@ route_stats_out = route_stats.select(
     col("DESTINATION_STATE").alias("destination_state"),
     col("ORIGIN_LATITUDE").alias("original_latitude"),
     col("ORIGIN_LONGITUDE").alias("original_longitude"),
+    col("DESTINATION_LATITUDE").alias("destination_latitude"),
+    col("DESTINATION_LONGITUDE").alias("destination_longitude"),
     col("avg_delay")
 )
 
