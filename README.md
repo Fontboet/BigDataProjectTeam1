@@ -97,8 +97,23 @@ docker compose down
 ## Instruction
 Using **minikube** :
 ```bash
-minikube start
+minikube start \
+  --cpus=4 \
+  --memory=4096 \
+  --disk-size=30g \
+  --driver=docker
+```
+Verify minikube is running
+```bash
+minikube status
+cd /BigDataProjectTeam1/k8s
+```
+```bash
 ./start.sh
+```
+```bash
+chmod +x k8s/deploy.sh
+./k8s/deploy.sh
 ```
 To see how the process are going :
 ```bash
