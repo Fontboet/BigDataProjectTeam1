@@ -27,7 +27,7 @@ docker compose logs kafka-init --no-log-prefix | tail -n 100
 ```
 Run producer manually if run first time:
 ```bash
-docker compose up -d producer
+docker compose --profile manual up -d producer
 ```
 Validate producer -> Kafka:
 ```bash
@@ -66,6 +66,12 @@ Validate delay_by_reason:
 ```bash
 docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at, delay_reason, count, avg_duration
 FROM flights_db.delay_by_reason;\""
+```
+Validate hourly_stats:
+```bash
+docker compose exec cassandra bash -lc "cqlsh -e \"SELECT updated_at,
+scheduled_hour, avg_delay
+FROM flights_db.hourly_stats;\""
 ```
 Confirm HDFS cluster status :
 ```bash
