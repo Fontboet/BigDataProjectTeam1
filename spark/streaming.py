@@ -14,7 +14,7 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 CHECKPOINT_BASE = os.environ.get("CHECKPOINT_DIR", "/tmp/checkpoint")
-# CHECKPOINT_BASE = "hdfs://namenode-0.namenode.bigdata.svc.cluster.local:8020/checkpoint"
+CHECKPOINT_BASE = "hdfs://namenode-0.namenode.bigdata.svc.cluster.local:8020/checkpoint"
 
 # Test HDFS connectivity
 if CHECKPOINT_BASE.startswith("hdfs://"):
@@ -394,14 +394,20 @@ query4 = hourly_stats_out.writeStream \
     .start()
 
 # # Archival writings of the enriched flight data to HDFS
-if CHECKPOINT_BASE.startswith("hdfs://"):
-    query5 = flights_airlines_airports_df.writeStream \
-        .outputMode("append") \
-        .format("parquet") \
-        .option("path", "hdfs://namenode:9000/flights") \
-        .option("checkpointLocation", f"{CHECKPOINT_BASE}/flights") \
-        .trigger(processingTime="10 seconds") \
-        .start()
+try:
+    if CHECKPOINT_BASE.startswith("hdfs://"):
+        query5 = (
+            flights_airlines_airports_df.writeStream
+            .outputMode("append")
+            .format("parquet")
+            .option("path", "hdfs://namenode-0.namenode.bigdata.svc.cluster.local:8020/flights")
+            .option("checkpointLocation", f"{CHECKPOINT_BASE}/flights")
+            .trigger(processingTime="10 seconds")
+            .start()
+        )
+        print("Streaming query started successfully.")
+except Exception as e:
+    print(f"Error when trying to start query : {e}")
 
 print(f"Started {len(spark.streams.active)} streaming queries")
 spark.streams.awaitAnyTermination()

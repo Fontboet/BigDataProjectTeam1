@@ -77,11 +77,6 @@ spec:
           name: dn-ipc
         - containerPort: 9864
           name: dn-http
-        startupProbe:
-          tcpSocket:
-            port: 9864
-          failureThreshold: 24
-          periodSeconds: 12
         resources:
           limits:
             cpu: "500m"

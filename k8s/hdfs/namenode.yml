@@ -60,11 +60,6 @@ spec:
           name: nn-rpc
         - containerPort: 9870
           name: nn-web
-        startupProbe:
-          tcpSocket:
-            port: 8020
-          failureThreshold: 24
-          periodSeconds: 10
         resources:
           limits:
             cpu: "500m"
