@@ -21,17 +21,20 @@ mv data/flights.csv kafka/
 Using **minikube** :
 ```bash
 minikube start \
-# You can specify with the following for example, or more (preferably)
-#   --cpus=4 \
-#   --memory=6000 \
-#   --disk-size=30g \
-#   --driver=docker
+  --cpus=4 \
+  --memory=6000 \
+  --disk-size=30g \
+  --driver=docker
 ```
 
 Start the deployment :
 
 ```bash
 ./start.sh
+```
+Manually port forwarding Grafana if script fails
+```bash
+kubectl port-forward -n bigdata svc/grafana 3000:3000
 ```
 
 To see how the process are going :
