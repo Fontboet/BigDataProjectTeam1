@@ -60,7 +60,7 @@ spec:
                 --conf spark.sql.shuffle.partitions=4 \
                 --conf spark.jars.ivy=/tmp/.ivy2 \
                 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector-assembly_2.12:3.5.0 \
-                /app/spark/streaming.py
+                /app/scripts/streaming.py
 
                 EXIT_CODE=$?
 
@@ -89,17 +89,21 @@ spec:
             - name: CASSANDRA_PORT
               value: "9042"
           volumeMounts:
-            - name: project
-              mountPath: /app
             - name: ivy
               mountPath: /tmp/.ivy2
             - name: checkpoints
               mountPath: /tmp/checkpoint
+            - name: csv-data
+              mountPath: /app/data/smallcsv
+            - name: spark-scripts
+              mountPath: /app/scripts
       volumes:
-        - name: project
-          hostPath:
-            path: /mnt/myproject
-            type: Directory
+        - name: csv-data
+          configMap:
+            name: csv-data
+        - name: spark-scripts
+          configMap:
+            name: spark-scripts
         - name: hadoop-conf
           configMap:
             name: hadoop-conf

@@ -34,6 +34,13 @@ spec:
           ports:
             - containerPort: 7077
             - containerPort: 8080
+          volumeMounts:
+          - name: csv-data
+            mountPath: /app/data/smallcsv
+      volumes:
+        - name: csv-data
+          configMap:
+            name: csv-data
 ---
 apiVersion: v1
 kind: Service

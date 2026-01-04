@@ -63,10 +63,7 @@ spec:
         resources:
           limits:
             cpu: "500m"
-            memory: 1Gi
-          requests:
-            cpu: "500m"
-            memory: 1Gi
+            memory: 256Mi
         volumeMounts:
         - name: namenode-pv-claim
           mountPath: /hadoop/dfs/name
@@ -81,4 +78,4 @@ spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
-          storage: 1Gi
+          storage: 5Gi

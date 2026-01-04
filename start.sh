@@ -17,14 +17,12 @@ else
 fi
 
 
-echo "📁 Mounting project directory..."
-minikube mount "$(pwd)":/mnt/myproject &
-MOUNT_PID=$!
+# echo "📁 Mounting project directory..."
+# minikube mount "$(pwd)":/mnt/myproject &
+# MOUNT_PID=$!
 
 echo ""
 echo "🔄 Enabling Minikube addons..."
-minikube addons enable metrics-server
-minikube addons enable dashboard
 echo ""
 
 echo ""
@@ -33,12 +31,23 @@ kubectl apply -f k8s/namespace.yml
 kubectl config set-context --current --namespace=bigdata
 echo ""
 echo "Loading Kubernetes configurations..."
-kubectl apply -R -f k8s/
+kubectl create configmap spark-scripts \
+  --from-file=streaming.py=./spark/streaming.py \
+  -n bigdata
+kubectl create configmap kafka-producer-script \
+  --from-file=kafka_producer.py=./kafka/kafka_producer.py \
+  -n bigdata
 kubectl create configmap grafana-dashboard \
   --from-file=./grafana/dashboard.json \
   -n bigdata
-echo "✅ Mount started (PID: $MOUNT_PID)"
-
+kubectl create configmap cassandra-init-script \
+  --from-file=init.cql=./cassandra/init_cassandra.cql \
+  -n bigdata
+kubectl create configmap csv-data \
+  --from-file=airports.csv=./data/smallcsv/airports.csv \
+  --from-file=airlines.csv=./data/smallcsv/airlines.csv \
+  -n bigdata
+kubectl apply -R -f k8s/
 echo ""
 echo "==============================="
 echo " Big Data Project"
@@ -66,10 +75,12 @@ for i in {1..24}; do
   sleep 5
   if kill -0 $FWD_PID 2>/dev/null; then
     echo "Port-forward Grafana OK"
-    wait $MOUNT_PID
+    wait $FWD_PID
   fi
 done
 
 echo "Grafana port-forward failed after 2 minutes."
 echo "Please start it manually with:"
 echo "kubectl port-forward -n bigdata svc/grafana 3000:3000"
+echo "If you want to restart the environmnent, use :  "
+echo "'kubectl delete namespace bigdata' and run this script again."

@@ -125,8 +125,8 @@ flights_df.printSchema()
 flights_df = flights_df.drop("YEAR", "MONTH", "DAY", "DAY_OF_WEEK", "FLIGHT_NUMBER", "TAIL_NUMBER", "ARRIVAL_TIME", "DEPARTURE_TIME")
 
 # Load static data
-airport_df = spark.read.csv('file:///app/data/smallcsv/airports.csv', header=True, inferSchema=True)
-airline_df = spark.read.csv('file:///app/data/smallcsv/airlines.csv', header=True, inferSchema=True)
+airport_df = spark.read.csv('/app/data/smallcsv/airports.csv', header=True, inferSchema=True)
+airline_df = spark.read.csv('/app/data/smallcsv/airlines.csv', header=True, inferSchema=True)
 airport_df.count()
 airline_df.count()
 

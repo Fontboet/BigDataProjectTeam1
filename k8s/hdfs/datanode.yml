@@ -79,11 +79,8 @@ spec:
           name: dn-http
         resources:
           limits:
-            cpu: "500m"
-            memory: 1Gi
-          requests:
-            cpu: "500m"
-            memory: 1Gi
+            cpu: "250m"
+            memory: 512Mi
         volumeMounts:
         - name: datanode-pv-claim
           mountPath: /hadoop/dfs/data

@@ -31,10 +31,9 @@ spec:
           ports:
             - containerPort: 8081
           volumeMounts:
-            - name: project
-              mountPath: /app
+            - name: csv-data
+              mountPath: /app/data/smallcsv
       volumes:
-        - name: project
-          hostPath:
-            path: /mnt/myproject
-            type: Directory
+        - name: csv-data
+          configMap:
+            name: csv-data

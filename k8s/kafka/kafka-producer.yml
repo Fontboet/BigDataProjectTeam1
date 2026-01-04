@@ -4,7 +4,7 @@ metadata:
   name: kafka-producer
   namespace: bigdata
 spec:
-  backoffLimit: 3   # Retry up to 3 times if the job fails
+  backoffLimit: 3
   template:
     metadata:
       labels:
@@ -19,44 +19,58 @@ spec:
             - sh
             - -c
             - |
-              echo "Waiting for Kafka to be ready..."
+              echo "Waiting for Kafka..."
               until kafka-broker-api-versions --bootstrap-server kafka:9092 >/dev/null 2>&1; do
-                echo "Kafka not ready yet, waiting 10 seconds..."
-                sleep 10
+                sleep 5
               done
-              echo "Kafka is ready!"
+              echo "Kafka ready"
+
+        - name: load-csv
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              if [ -f /data/flights.csv ]; then
+                echo "CSV already exists, skipping download"
+              else
+                echo "Copying CSV..."
+                cp /source/flights.csv /data/flights.csv
+                chmod 644 /data/flights.csv
+              fi
+          volumeMounts:
+            - name: csv-data
+              mountPath: /data
+            - name: csv-source
+              mountPath: /source
 
       containers:
         - name: producer
           image: python:3.10-slim
-          workingDir: /mnt/project
+          workingDir: /app
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: kafka:9092
             - name: KAFKA_TOPIC
               value: flights_topic
+            - name: CSV_FILE
+              value: /data/flights.csv
           command:
             - sh
             - -c
             - |
-              echo "Installing dependencies..."
-              pip install --no-cache-dir -r requirements.txt
-              echo "Starting Kafka producer..."
-              python kafka/kafka_producer.py
+              pip install --no-cache-dir kafka-python
+              python kafka_producer.py
           volumeMounts:
-            - name: project
-              mountPath: /mnt/project
-              readOnly: true
-      resources:
-        requests:
-          memory: "128Mi"
-          cpu: "100m"
-        limits:
-          memory: "256Mi"
-          cpu: "250m"
+            - name: csv-data
+              mountPath: /data
+            - name: app-code
+              mountPath: /app
 
       volumes:
-        - name: project
-          hostPath:
-            path: /mnt/myproject
-            type: Directory
+        - name: csv-data
+          persistentVolumeClaim:
+            claimName: csv-data
+        - name: app-code
+          configMap:
+            name: kafka-producer-script
