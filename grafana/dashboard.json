@@ -18,6 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "id": 0,
   "links": [],
   "panels": [
     {
@@ -25,7 +26,28 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "continuous-GrYlRd"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "scheme",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -45,72 +67,65 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 12,
-        "x": 6,
+        "x": 0,
         "y": 0
       },
-      "id": 1,
+      "id": 4,
       "options": {
-        "displayMode": "gradient",
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "colorByField": "scheduled_hour",
+        "fullHighlight": false,
+        "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": false
+          "showLegend": true
         },
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": true
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
         },
-        "showUnfilled": false,
-        "sizing": "auto",
-        "valueMode": "color"
+        "xField": "time",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
-      "pluginVersion": "12.3.1",
+      "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "Cassandra",
+          "columnTime": "updated_at",
+          "columnValue": "scheduled_hour",
+          "datasourceId": 1,
+          "keyspace": "flights_db",
           "queryType": "query",
           "rawQuery": true,
           "refId": "A",
-          "target": "SELECT airline, delayed_flights FROM flights_db.airline_stats"
+          "table": "hourly_stats",
+          "target": "SELECT updated_at, scheduled_hour AS time, avg_delay\nFROM flights_db.hourly_stats;"
         }
       ],
-      "title": "Podium",
+      "title": "New panel",
       "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
         {
           "id": "sortBy",
           "options": {
             "fields": {},
             "sort": [
               {
-                "desc": true,
-                "field": "delayed_flights"
+                "field": "time"
               }
             ]
           }
-        },
-        {
-          "id": "limit",
-          "options": {
-            "limitField": "5"
-          }
         }
       ],
-      "type": "bargauge"
+      "type": "barchart"
     },
     {
       "datasource": "Cassandra",
@@ -119,6 +134,13 @@
           "color": {
             "mode": "thresholds"
           },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -126,6 +148,10 @@
               {
                 "color": "green",
                 "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
           }
@@ -136,122 +162,114 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 9
+        "y": 8
       },
       "id": 3,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "basemap": {
+          "config": {},
+          "name": "Layer 0",
+          "noRepeat": false,
+          "type": "default"
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "datasource": "Cassandra",
-          "queryType": "query",
-          "rawQuery": true,
-          "refId": "A",
-          "target": "SELECT on_time_flights, delayed_flights, cancelled_flights \nFROM flights_db.airline_stats"
-        }
-      ],
-      "title": "KPIs",
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": false,
+          "showScale": false,
+          "showZoom": true
         },
-        {
-          "id": "reduce",
-          "options": {
-            "includeTimeField": false,
-            "mode": "reduceFields",
-            "reducers": [
-              "sum"
-            ]
-          }
-        }
-      ],
-      "type": "stat"
-    },
-    {
-      "datasource": "Cassandra",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "color-background"
-            },
-            "footer": {
-              "reducers": []
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 10
-              },
-              {
-                "color": "red",
-                "value": 20
+        "layers": [
+          {
+            "config": {
+              "blur": 15,
+              "radius": 5,
+              "weight": {
+                "fixed": 1,
+                "max": 1,
+                "min": 0
               }
-            ]
+            },
+            "location": {
+              "latitude": "destination_latitude",
+              "longitude": "destination_longitude",
+              "mode": "coords"
+            },
+            "name": "Layer 1",
+            "tooltip": true,
+            "type": "heatmap"
+          },
+          {
+            "config": {
+              "showLegend": true,
+              "style": {
+                "color": {
+                  "fixed": "dark-green"
+                },
+                "opacity": 0.5,
+                "rotation": {
+                  "fixed": 0,
+                  "max": 360,
+                  "min": -360,
+                  "mode": "mod"
+                },
+                "size": {
+                  "fixed": 15,
+                  "max": 15,
+                  "min": 2
+                },
+                "symbol": {
+                  "fixed": "img/icons/marker/plane.svg",
+                  "mode": "fixed"
+                },
+                "symbolAlign": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "textConfig": {
+                  "fontSize": 12,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "textAlign": "center",
+                  "textBaseline": "middle"
+                }
+              }
+            },
+            "location": {
+              "latitude": "original_latitude",
+              "longitude": "original_longitude",
+              "mode": "coords"
+            },
+            "name": "Layer 2",
+            "tooltip": true,
+            "type": "markers"
           }
+        ],
+        "tooltip": {
+          "mode": "details"
         },
-        "overrides": []
+        "view": {
+          "allLayers": true,
+          "id": "north-america",
+          "lat": 40,
+          "lon": -100,
+          "noRepeat": false,
+          "zoom": 4
+        }
       },
-      "gridPos": {
-        "h": 16,
-        "w": 12,
-        "x": 12,
-        "y": 9
-      },
-      "id": 2,
-      "options": {
-        "cellHeight": "sm",
-        "showHeader": true
-      },
-      "pluginVersion": "12.3.1",
+      "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "Cassandra",
+          "datasourceId": 1,
           "queryType": "query",
           "rawQuery": true,
           "refId": "A",
-          "target": "SELECT original_airport, destination_airport, avg_delay\nFROM flights_db.route_stats\nLIMIT 20"
+          "target": "SELECT updated_at, original_airport, destination_airport, avg_delay, original_latitude,\n    original_longitude,\n    destination_latitude,\n    destination_longitude\nFROM flights_db.route_stats\nWHERE ORIGINAL_AIRPORT = 'STL'\nALLOW FILTERING;"
         }
       ],
-      "title": "Heatmap",
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        }
-      ],
-      "type": "table"
+      "title": "New panel",
+      "type": "geomap"
     },
     {
       "datasource": "Cassandra",
@@ -275,22 +293,25 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 17
+        "y": 16
       },
-      "id": 4,
+      "id": 2,
       "options": {
+        "displayLabels": [
+          "percent"
+        ],
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
-        "pieType": "donut",
+        "pieType": "pie",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
-          "fields": "",
-          "values": false
+          "fields": "/^count$/",
+          "values": true
         },
         "sort": "desc",
         "tooltip": {
@@ -299,33 +320,175 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.1",
+      "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "Cassandra",
+          "datasourceId": 1,
           "queryType": "query",
           "rawQuery": true,
           "refId": "A",
-          "target": "SELECT updated_at, on_time_flights, delayed_flights\nFROM flights_db.airline_stats\nWHERE airline = 'AA'\nALLOW FILTERING"
+          "target": "SELECT updated_at, delay_reason, count\nFROM flights_db.delay_by_reason;"
         }
       ],
-      "title": "Flight Distribution (AA)",
+      "title": "New panel",
       "type": "piechart"
+    },
+    {
+      "datasource": "Cassandra",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "dark-green",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "UA total_flights"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": []
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "delayed_flights"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "shades"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 1,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "airline",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "columnTime": "updated_at",
+          "columnValue": "total_flights",
+          "datasource": "Cassandra",
+          "datasourceId": 1,
+          "hide": false,
+          "instant": false,
+          "keyspace": "flights_db",
+          "queryType": "query",
+          "rawQuery": true,
+          "refId": "A",
+          "table": "airline_stats",
+          "target": "SELECT updated_at, airline, on_time_flights, delayed_flights FROM flights_db.airline_stats;"
+        }
+      ],
+      "title": "New panel",
+      "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": true,
+                "field": "on_time_flights"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "barchart"
     }
   ],
   "preload": false,
-  "refresh": "5s",
+  "refresh": "",
   "schemaVersion": 42,
   "tags": [],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-5m",
-    "to": "now"
+    "from": "2026-01-04T09:32:41.955Z",
+    "to": "2026-01-04T09:32:41.955Z"
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Visualization",
-  "version": 1
+  "title": "stackbarchart",
+  "uid": "adrt9kd",
+  "version": 5
 }

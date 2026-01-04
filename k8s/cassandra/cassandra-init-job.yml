@@ -31,7 +31,6 @@ spec:
           volumeMounts:
             - name: project
               mountPath: /mnt/myproject
-
       volumes:
         - name: project
           hostPath:

@@ -11,27 +11,29 @@ spec:
         app: spark-submit
     spec:
       restartPolicy: OnFailure
-      # initContainers:
-      # - name: wait-for-hdfs
-      #   image: bde2020/hadoop-base:2.0.0-hadoop3.2.1-java8
-      #   volumeMounts:
-      #     - name: hadoop-conf
-      #       mountPath: /etc/hadoop
-      #   command:
-      #     - bash
-      #     - -c
-      #     - |
-      #       echo "Waiting for HDFS (max 3 tries)..."
-      #       for i in $(seq 1 3); do
-      #         echo "Attempt $i/3"
-      #         if hdfs dfsadmin -safemode get | grep -q "OFF"; then
-      #           echo "HDFS is ready"
-      #           exit 0
-      #         fi
-      #         sleep 20
-      #       done
-      #       echo "HDFS not ready after 1 minute, restarting."
-      #       exit 1
+      initContainers:
+        - name: wait-for-cassandra
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Cassandra to be ready..."
+              max_attempts=10
+              attempt=0
+              while true; do
+                if nc -z cassandra 9042; then
+                  echo "Cassandra is up!"
+                  break
+                fi
+                attempt=$((attempt+1))
+                if [ "$attempt" -ge "$max_attempts" ]; then
+                  echo "ERROR: Cassandra not ready after $attempt attempts"
+                  exit 1
+                fi
+                echo "Cassandra not ready... ($attempt/$max_attempts)"
+                sleep 15
+              done
       containers:
         - name: spark-submit
           image: apache/spark:3.5.3
