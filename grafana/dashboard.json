@@ -111,7 +111,7 @@
           "target": "SELECT updated_at, scheduled_hour AS time, avg_delay\nFROM flights_db.hourly_stats;"
         }
       ],
-      "title": "New panel",
+      "title": "Avg Delay by Schedule Hour",
       "transformations": [
         {
           "id": "sortBy",
@@ -268,7 +268,7 @@
           "target": "SELECT updated_at, original_airport, destination_airport, avg_delay, original_latitude,\n    original_longitude,\n    destination_latitude,\n    destination_longitude\nFROM flights_db.route_stats\nWHERE ORIGINAL_AIRPORT = 'STL'\nALLOW FILTERING;"
         }
       ],
-      "title": "New panel",
+      "title": "Delay of routes from STL airport",
       "type": "geomap"
     },
     {
@@ -330,7 +330,7 @@
           "target": "SELECT updated_at, delay_reason, count\nFROM flights_db.delay_by_reason;"
         }
       ],
-      "title": "New panel",
+      "title": "Delay by reasons",
       "type": "piechart"
     },
     {
@@ -457,7 +457,7 @@
           "target": "SELECT updated_at, airline, on_time_flights, delayed_flights FROM flights_db.airline_stats;"
         }
       ],
-      "title": "New panel",
+      "title": "Airlines Performance",
       "transformations": [
         {
           "id": "sortBy",
