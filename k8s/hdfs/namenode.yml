@@ -4,8 +4,7 @@ metadata:
   name: namenode
   namespace: bigdata
   labels:
-    app.kubernetes.io/name: namenode
-    app.kubernetes.io/version: "1.0"
+    app: namenode
 spec:
   ports:
     - port: 8020
@@ -15,8 +14,7 @@ spec:
       protocol: TCP
       name: nn-web
   selector:
-    app.kubernetes.io/name: namenode
-    app.kubernetes.io/version: "1.0"
+    app: namenode
   type: ClusterIP
 ---
 apiVersion: apps/v1
@@ -25,20 +23,17 @@ metadata:
   name: namenode
   namespace: bigdata
   labels:
-    app.kubernetes.io/name: namenode
-    app.kubernetes.io/version: "1.0"
+    app: namenode
 spec:
   serviceName: namenode
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: namenode
-      app.kubernetes.io/version: "1.0"
+      app: namenode
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: namenode
-        app.kubernetes.io/version: "1.0"
+        app: namenode
     spec:
       initContainers:
       - name: delete-lost-found
@@ -67,10 +62,6 @@ spec:
         volumeMounts:
         - name: namenode-pv-claim
           mountPath: /hadoop/dfs/name
-      volumes:
-      - name: hadoop-conf
-        configMap:
-          name: hadoop-conf
   volumeClaimTemplates:
   - metadata:
       name: namenode-pv-claim
