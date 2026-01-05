@@ -162,6 +162,12 @@ Grafana:
 docker compose down
 ```
 
+# Participation
+- Eliott : 20%
+- Etienne : 25%
+- Tu : 45%
+- Florian : 5%
+- Philippe : 5%
 
 # Configs
 ## Kafka
@@ -169,7 +175,7 @@ Short guide to choose Kafka producer settings (tradeoffs + examples).
 
 Key principles
 
-Durability vs throughput vs latency: acks and retries impact durability; batch_size and linger_ms impact throughput and latency; compression reduces network at cost of CPU.
+Durability vs throughput vs latency : acks and retries impact durability; batch_size and linger_ms impact throughput and latency; compression reduces network at cost of CPU.
 Broker config matters: acks='all' requires replication and min.insync.replicas settings. Topic auto-recovery / re-creation can interfere with deletes.
 Measure & iterate: benchmark with your payload size and target throughput, monitor producer/broker metrics (request-latency, record-send-rate, batch-size, record-error-rate).
 Parameter-by-parameter (quick)
