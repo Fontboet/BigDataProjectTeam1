@@ -1,5 +1,10 @@
 # Hanoi University of Science and Technology
-# BigDataProjectTeam1
+# Participation
+- Eliott : 20% Docker + Kafka
+- Etienne : 25% HDFS + Kubernetes Deployment
+- Tu : 45% Docker + Kafka + Spark + Cassandra + Grafana
+- Florian : 5% Grafana Visualization
+- Philippe : 5% Survey documents and datasets
 Big Data Storage and Processing 2025 Project Team 1
 <p align="center">
   <img src="./image.png" alt="BigDataProjectTeam1 pipeline overview" width="800"/>
@@ -154,20 +159,12 @@ Grafana:
 - CSV -> Kafka: `kafka/kafka_producer.py` reads `data/flights.csv` and sends JSON per row
 - Kafka -> Spark schema: `spark/streaming.py` defines fields like `AIRLINE`, `ORIGIN_AIRPORT`, delays, distance
 - Joins: airlines by `IATA_CODE`; airports by origin/destination IATA codes
-- Cassandra tables:
 
 
 ## Stop Everything
 ```bash
 docker compose down
 ```
-
-# Participation
-- Eliott : 20%
-- Etienne : 25%
-- Tu : 45%
-- Florian : 5%
-- Philippe : 5%
 
 # Configs
 ## Kafka
